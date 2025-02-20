@@ -54,6 +54,11 @@ steps:
     mkdir -p /opt/output/nvme
     output_dir=/opt/output/nvme /opt/spdk/autorun.sh /opt/configs/nvme.conf
 
+- name: autorun_nvmf
+  run: |
+    mkdir -p /opt/output/nvmf
+    output_dir=/opt/output/nvmf /opt/spdk/autorun.sh /opt/configs/nvmf.conf
+
 - name: output_listing
   run: |
     ls /opt
