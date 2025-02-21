@@ -55,6 +55,7 @@ steps:
   run: |
     dnf update -y
     dnf install -y git perl-JSON-PP
+    dnf install -y xxd # those are temporary here and will be moved to pkgdep.sh or autotest_setup.sh
     dnf autoremove -y
     dnf clean all -y
 
