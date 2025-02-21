@@ -49,6 +49,52 @@ jobs:
     needs: checkout_spdk
     uses: ./.github/workflows/per_patch.yml
 
+  summary:
+    runs-on: ubuntu-latest
+    needs:
+    - tests
+    steps:
+    - name: Download the SPDK repository
+      uses: actions/download-artifact@v4.1.8
+      with:
+        name: repository
+        path: ${{ github.workspace }}/spdk
+
+    - name: Download artifact tarballs
+      uses: actions/download-artifact@v4.1.8
+      with:
+        pattern: 'autorun_*_artifacts'
+    
+    - name: Show artifacts
+      run: |
+        cd spdk && tar -xf ./repository.tar.gz && cd ..
+
+        # Temporary, will remove before removing "draft" label
+        pip install pandas
+        sudo apt update && apt install -y lcov
+
+        # Favourite part <3
+        # lcov when registers /opt/spdk/** paths for files when running in Qemu
+        # spawned by cijoe. But the working directory and paths are different
+        # in this step so need to replace them.
+        # This should be an option in autorun_post.py script itself.
+        sed -i -e "s#^SF:/[^/]*/spdk/#SF:$PWD/spdk/#" */cov_total.info
+
+        spdk/autorun_post.py -s -d ./ -r ./spdk
+        ls -la
+        ls -la coverage
+        ls -la ut_coverage
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4.4.0
+      with:
+        name: _autorun_summary_output
+        path: |
+          post_process
+          coverage
+          ut_coverage
+          doc
+
   report:
     # Only run if it was triggered by Gerrit event, with JSON for it
     if: ${{ needs.checkout_spdk.outputs.is_called == 'true' }}
