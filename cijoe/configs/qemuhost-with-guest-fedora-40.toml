@@ -51,4 +51,9 @@ cloud.path = "{{ local.env.HOME }}/system_imaging/cloud/Fedora-Cloud-Base-Generi
 cloud.metadata_path = "{{ resources.auxiliary['system_imaging.cloudinit-linux-common-metadata'] }}"
 cloud.userdata_path = "{{ resources.auxiliary['system_imaging.cloudinit-linux-common-userdata'] }}"
 
-disk.path = "/__w/spdk-ci/spdk-ci/fedora_40_x86_64.qcow2"
+disk.path = "{{ local.env.HOME }}/system_imaging/disk/fedora_40_x86_64.qcow2"
+disk.url = "https://spdk-community-ci.s3.eu-central-003.backblazeb2.com/system/fedora_40_x86_64.qcow2"
+
+docker.url = "ghcr.io/safl/spdk-ci/spdk-ci:poc"
+docker.name = "spdk-ci"
+docker.tag = "poc"
