@@ -8,7 +8,7 @@ doc: |
   * cloud-init
   * cijoe
 
-  The workflow can re-use scripts built-in / bundled with the default cijoe
+  The workflow can reuse scripts built-in / bundled with the default cijoe
   installation, which delegates most of command-line calls into scripts. As an
   overview, the following is done
 
@@ -23,7 +23,7 @@ doc: |
   * Convert the image (with compression)
     - qemu-img convert boot.img /tmp/fedora-41-x86_64.qcow2 -O qcow2 -c
 
-  * Upload it to publically available storage
+  * Upload it to publicly available storage
 
 steps:
 - name: diskimage_from_cloudimage
