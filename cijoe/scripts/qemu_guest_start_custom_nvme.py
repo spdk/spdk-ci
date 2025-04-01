@@ -35,7 +35,7 @@ class QemuNvme:
         Generate a subsystem configuration
         @param id Identifier, could be something like 'subsys0'
         @param nqn Non-qualified-name, assigned verbatim when provided
-        @param aux Auxilary arguments, e.g. add {fdp: on} here, to enable fdp
+        @param aux Auxiliary arguments, e.g. add {fdp: on} here, to enable fdp
         """
 
         args = {"id": id}
