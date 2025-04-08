@@ -22,6 +22,29 @@ on:
 env:
   spdk_path: './spdk'
 jobs:
+  report-start-ci:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Report start of ci
+      # Only run if it was triggered by Gerrit event, with JSON for it
+      if: ${{ inputs.client_payload != '' && fromJson(inputs.client_payload) != '' || false }}
+      env:
+        message: "Build started here ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        vote: 0
+      run: |
+        set -e
+
+        change_num="${{ fromJson(inputs.client_payload).change.number }}"
+        patch_set="${{ fromJson(inputs.client_payload).patchSet.number }}"
+
+        echo "Gerrit: <https://review.spdk.io/c/spdk/spdk/+/$change_num/$patch_set>" >> $GITHUB_STEP_SUMMARY
+
+        curl -L -X POST https://review.spdk.io/a/changes/$change_num/revisions/$patch_set/review \
+        --user "${{ secrets.GERRIT_BOT_USER }}:${{ secrets.GERRIT_BOT_HTTP_PASSWD }}" \
+        --header "Content-Type: application/json" \
+        --data "{'message': '${{ env.message }}', 'labels': {'Verified': ${{ env.vote }} }}" \
+        --fail-with-body
+
   checkout_spdk:
     runs-on: ubuntu-latest
     env:
