@@ -17,7 +17,7 @@ spdk_repo=$REPO
 gerrit_comment=$COMMENT
 reported_by=$AUTHOR
 
-gerrit_url=https://review.spdk.io/a/changes
+gerrit_url=https://review.spdk.io/changes
 gerrit_format_q="o=DETAILED_ACCOUNTS&o=MESSAGES&o=LABELS&o=SKIP_DIFFSTAT"
 
 # Looking for comment thats only content is "false positive: 123", with a leeway for no spaces
@@ -46,7 +46,15 @@ fi
 curl -s -X GET \
 	--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
 	"$gerrit_url/spdk%2Fspdk~$change_num?$gerrit_format_q" \
-	| tail -n +2 | jq . | tee change.json
+	| tee _change.json
+
+if grep "Not found: spdk/spdk~$change_num"; then
+	echo "Change $change_num not found, exiting."
+	echo "Either it's a private change or in restricted branch."
+	exit 0
+fi
+tail -n +2 _change.json | jq . > change.json
+rm -f _change.json
 
 # Do not test any change marked as WIP
 ready_for_review="$(jq -r '.has_review_started' change.json)"
