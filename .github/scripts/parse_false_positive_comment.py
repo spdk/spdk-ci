@@ -72,8 +72,8 @@ def get_url_details_from_failed_build(build):
 
 def main():
     env = Env()
-    gerrit = Gerrit(env, auth=True)
-    github = GitHub(env, auth=True)
+    gerrit = Gerrit(env, auth=env.gh_auth)
+    github = GitHub(env, auth=env.gerrit_auth)
 
     change_details = gerrit.get_change()
     change_gh_details = github.get_issue_from_gerrit_comment()
