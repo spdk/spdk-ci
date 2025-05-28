@@ -24,7 +24,7 @@
 # 2. Collect artifacts produced during execution.
 # 3. Integrate with third-party services, such as S3.
 #
-name: SPDK-CI build VM image
+name: SPDK-CI build FreeBSD VM image
 
 on:
   workflow_dispatch:
@@ -36,9 +36,9 @@ on:
   push:
     branches: ["main"]
     paths:
-    - '.github/workflows/build_qcow2.yml'
-    - 'cijoe/configs/qemuhost-with-guest-fedora-40.toml'
-    - 'cijoe/workflows/build_qcow2_using_qemu.yaml'
+    - '.github/workflows/build_freebsd_qcow2.yml'
+    - 'cijoe/configs/qemuhost-with-guest-freebsd-14.toml'
+    - 'cijoe/workflows/build_freebsd_qcow2_using_qemu.yaml'
 
 jobs:
 
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
 
     concurrency:
-      group: build_qcow2
+      group: build_freebsd_qcow2
       cancel-in-progress: false
 
     steps:
@@ -68,7 +68,7 @@ jobs:
         name: repo-spdk
         path: spdk.tar.gz
 
-  build-qcow2:
+  build-freebsd-qcow2:
     needs: source-archive
     runs-on: ubuntu-latest
     container:
@@ -83,7 +83,7 @@ jobs:
       REPOSITORY_TARBALL_PATH: ${{ github.workspace }}/spdk.tar.gz
 
     concurrency:
-      group: build_qcow2
+      group: build_freebsd_qcow2
       cancel-in-progress: false
 
     steps:
@@ -102,8 +102,8 @@ jobs:
         cd ci/cijoe
         cijoe \
         --monitor \
-        --config configs/qemuhost-with-guest-fedora-40.toml \
-        --workflow workflows/build_qcow2_using_qemu.yaml
+        --config configs/qemuhost-with-guest-freebsd-14.toml \
+        --workflow workflows/build_freebsd_qcow2_using_qemu.yaml
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4.4.0
@@ -114,37 +114,37 @@ jobs:
 
     - name: Change image format and compress
       run: |
-        qemu-img convert $HOME/guests/generic-bios-kvm-x86_64/boot.img fedora_40_x86_64.qcow2 -O qcow2 -c
+        qemu-img convert $HOME/guests/generic-bios-kvm-x86_64/boot.img freebsd_14_x86_64.qcow2 -O qcow2 -c
 
-    - name: Store Qcow2 build artifacts
+    - name: Store FreeBSD Qcow2 build artifacts
       uses: actions/upload-artifact@v4.4.0
       with:
-        name: vm-image-fedora_40_x86_64
+        name: vm-image-freebsd_14_x86_64
         compression-level: 0
-        path: fedora_40_x86_64.qcow2
+        path: freebsd_14_x86_64.qcow2
 
-  cache-qcow2:
-    needs: build-qcow2
+  cache-freebsd-qcow2:
+    needs: build-freebsd-qcow2
     runs-on: ubuntu-latest
 
     steps:
     - name: Download VM Qcow2 image artifact
       uses: actions/download-artifact@v4.1.8
       with:
-        name: vm-image-fedora_40_x86_64
+        name: vm-image-freebsd_14_x86_64
 
     - name: Delete previous cache
       run: |
         gh extension install actions/gh-actions-cache
-        if gh actions-cache list --repo ${{ github.repository }} | grep -q "vm-image-fedora_40_x86_64"; then
-          gh actions-cache delete "vm-image-fedora_40_x86_64" --repo ${{ github.repository }} --confirm
+        if gh actions-cache list --repo ${{ github.repository }} | grep -q "vm-image-freebsd_14_x86_64"; then
+          gh actions-cache delete "vm-image-freebsd_14_x86_64" --repo ${{ github.repository }} --confirm
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Cache qcow2 image
+    - name: Cache FreeBSD qcow2 image
       id: cache-qcow2
       uses: actions/cache/save@v4
       with:
-        path: fedora_40_x86_64.qcow2
-        key: vm-image-fedora_40_x86_64
+        path: freebsd_14_x86_64.qcow2
+        key: vm-image-freebsd_14_x86_64
