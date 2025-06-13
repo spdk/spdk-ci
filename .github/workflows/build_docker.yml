@@ -41,6 +41,10 @@ on:
       distro:
         description: 'Distribution name_ver to build docker from qcow2 image'
         required: false
+        type: choice
+        options:
+        - fedora_40
+        - freebsd_14
         default: 'fedora_40'
 
 jobs:
@@ -66,7 +70,7 @@ jobs:
       packages: write
 
     env:
-      IMAGE_ID: ghcr.io/${{ github.repository_owner }}/spdk-ci:poc
+      IMAGE_ID: ghcr.io/${{ github.repository_owner }}/spdk-ci:${{ inputs.distro }}
 
     container:
       image: ghcr.io/refenv/cijoe-docker:v0.9.52
@@ -125,5 +129,5 @@ jobs:
       if: ${{ github.event.inputs.push_to_registry == 'true' }}
       run: |
         docker images
-        docker tag spdk-ci:poc ${IMAGE_ID}
+        docker tag spdk-ci:${{ inputs.distro }} ${IMAGE_ID}
         docker push ${IMAGE_ID}
