@@ -16,6 +16,11 @@ fail_fast = true
 [qemu]
 img_bin = "qemu-img"
 
+[qemu.repository]
+remote = "https://github.com/freebsd/freebsd.git"
+path = /usr/src
+tag = "release/14.2.0-p3"
+
 # Used by: qemu.guest_initialize.py, qemu.guest_start.py, and qemu.guest_kill.py
 [qemu.guests.generic-bios-kvm-x86_64]
 path = "{{ local.env.HOME }}/guests/generic-bios-kvm-x86_64"
