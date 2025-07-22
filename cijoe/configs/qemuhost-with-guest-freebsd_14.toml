@@ -23,7 +23,7 @@ path = "{{ local.env.HOME }}/guests/generic-bios-kvm-x86_64"
 system_label = "x86_64"
 # Due to https://doc.dpdk.org/guides/freebsd_gsg/build_dpdk.html#loading-the-dpdk-contigmem-module
 # increasing memeory here only for FreeBSD until the proper driver loading via /boot/loader.conf is fixed
-system_args.kwa = {cpu = "host", smp = 8, m = "16G", accel = "kvm"}
+system_args.kwa = {cpu = "host", smp = 8, m = "12G", accel = "kvm"}
 # Raw arguments: passed without modification to qemu-system-{arch}
 system_args.raw = """\
 -M "type=q35,kernel_irqchip=split" \
