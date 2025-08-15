@@ -60,6 +60,14 @@ jobs:
       with:
         name: _autorun_summary
         path: _autorun_summary
+
+    - name: Upload Report to Codecov
+      uses: codecov/codecov-action@v5.1.2
+      with:
+        directory: ./_autorun_summary/coverage
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: glimchb/spdk
+
     outputs:
       result: ${{ steps.autorun_post.outputs.result }}
 
