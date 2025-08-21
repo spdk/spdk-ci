@@ -76,6 +76,53 @@ jobs:
     outputs:
       artifact_id: ${{ steps.get_artifact_id.outputs.artifact_id }}
 
+  distros:
+    needs:
+    - checkout_spdk
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+        # os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+
+    - name: Download the SPDK repository
+      uses: actions/download-artifact@v4.1.8
+      with:
+        name: repo-spdk
+
+    - name: Download the SPDK ABI repository
+      uses: actions/download-artifact@v4.1.8
+      with:
+        name: repo-spdk-abi
+
+    - name: Extract the SPDK repository
+      run: |
+        tar xzf spdk.tar.gz --strip 1
+        tar xzf spdk-abi.tar.gz --strip 1
+
+    # TODO: consider 'autorun.sh' or 'autobuild.sh' or 'autotest.sh'
+
+    - name: Install additional packages
+      run: sudo ./scripts/pkgdep.sh --developer-tools
+
+    - name: Configure
+      run: |
+        ./configure --enable-coverage \
+            --without-uring \
+            --without-fio \
+            --without-rbd \
+            --without-rdma \
+            --without-shared \
+            --without-iscsi-initiator \
+            --without-vtune \
+            --without-vfio-user
+
+    - name: Make
+      run: make -j
+
   autorun:
     name: ${{ matrix.workflow }}
     needs:
