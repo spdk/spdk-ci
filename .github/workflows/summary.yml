@@ -2,6 +2,7 @@
 name: SPDK per-patch summary
 
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       client_payload:
@@ -12,6 +13,10 @@ on:
         required: true
         type: string
         default: 'failure'
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
 
 jobs:
   merge_outputs:
@@ -60,6 +65,15 @@ jobs:
       with:
         name: _autorun_summary
         path: _autorun_summary
+
+    - name: Upload Report to Codecov
+      uses: codecov/codecov-action@v5.1.2
+      with:
+        fail_ci_if_error: true
+        use_oidc: true
+        files: ./_autorun_summary/ut_coverage/ut_cov_unit.info,./_autorun_summary/ut_coverage/ut_cov_total.info
+        slug: spdk/spdk
+
     outputs:
       result: ${{ steps.autorun_post.outputs.result }}
 
