@@ -76,6 +76,53 @@ jobs:
     outputs:
       artifact_id: ${{ steps.get_artifact_id.outputs.artifact_id }}
 
+  distros-container:
+    needs:
+    - checkout_spdk
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+        - quay.io/centos/centos:8
+        - quay.io/centos/centos:9
+        - quay.io/centos/centos:10
+        - docker.io/rockylinux/rockylinux:8
+        - docker.io/rockylinux/rockylinux:9
+        - docker.io/rockylinux/rockylinux:10
+        - docker.io/opensuse/leap:15
+        - mcr.microsoft.com/azurelinux/base/core:3.0
+    container:
+      image: ${{ matrix.distro }}
+    steps:
+    - uses: actions/download-artifact@v4.1.8
+      with:
+        name: repo-spdk
+    - if: matrix.distro == 'quay.io/centos/centos:8' || matrix.distro == 'docker.io/rockylinux/rockylinux:8'
+      run: |
+        yum install -y --setopt=sslverify=0 --setopt=*.gpgcheck=False --repofrompath baseos2,http://vault.centos.org/centos/8/BaseOS/x86_64/os/  --disablerepo="*" yum-utils || true
+        yum install -y yum-utils || true
+    - if: matrix.distro == 'mcr.microsoft.com/azurelinux/base/core:3.0'
+      run: |
+        rpm --import https://packages.microsoft.com/keys/microsoft.asc || true
+        tdnf --nogpgcheck install -y tar || true
+    - if: matrix.distro == 'docker.io/opensuse/leap:15'
+      run: zypper install -y tar gzip unzip
+    - run: |
+        tar xzf spdk.tar.gz --strip 1
+        # TODO: consider 'autorun.sh' or 'autobuild.sh' or 'autotest.sh'
+        ./scripts/pkgdep.sh --all
+        ./configure --enable-coverage \
+            --without-uring \
+            --without-fio \
+            --without-rbd \
+            --without-rdma \
+            --without-shared \
+            --without-iscsi-initiator \
+            --without-vtune \
+            --without-vfio-user
+        make -j
+
   autorun:
     name: ${{ matrix.workflow }}
     needs:
