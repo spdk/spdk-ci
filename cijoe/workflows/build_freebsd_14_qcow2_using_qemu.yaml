@@ -51,9 +51,7 @@ steps:
     gpart recover vtbd0
     gpart resize -i 4 -s +10G vtbd0 || true
     gpart show
-    zpool list
-    zpool online -e zroot vtbd0p4 || true
-    zpool list
+    growfs /
     df -h
 
 - name: guest_update
