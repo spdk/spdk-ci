@@ -85,6 +85,7 @@ jobs:
     needs:
     - checkout_spdk
     strategy:
+      max-parallel: 5
       matrix:
         # Keep latest 2 versions of each flavor here
         distro:
@@ -146,6 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
+      max-parallel: 5
       matrix:
         workflow:
         - nvme-vm-autotest
