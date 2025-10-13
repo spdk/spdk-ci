@@ -13,6 +13,8 @@
 set -eu
 shopt -s extglob
 
+echo "SPDK: (${change_num}/${patch_set}) ${COMMENT}" >> "${GITHUB_STEP_SUMMARY}"
+
 spdk_repo=$REPO
 gerrit_comment=$COMMENT
 reported_by=$AUTHOR
