@@ -14,7 +14,7 @@ on:
         default: 'failure'
 
 jobs:
-  merge_outputs:
+  merge_outputs_and_report:
     # 22.04 used on purpose; it has lcov+gcov versions that are compatible with what
     # is used in cijoe's Fedora 40 images. Using lcov+gcov from ubuntu-latest results
     # in warnings and/or failures.
@@ -60,15 +60,9 @@ jobs:
       with:
         name: _autorun_summary
         path: _autorun_summary
-    outputs:
-      result: ${{ steps.autorun_post.outputs.result }}
 
-  report:
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    needs: merge_outputs
-    steps:
     - name: Vote count from workflows
+      if: ${{ always() }}
       id: vote_count
       run: |
         vote="-1"
@@ -76,7 +70,7 @@ jobs:
 
         # Combine results from jobs and autorun_post.py
         if [[ "${{ inputs.result }}" == "success" && \
-                "${{ needs.merge_outputs.outputs.result }}" == "success" ]]; then
+                "${{ steps.autorun_post.outputs.result }}" == "success" ]]; then
             vote="1"
             message="Build successful. "
         fi
