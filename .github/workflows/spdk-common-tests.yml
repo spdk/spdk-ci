@@ -23,6 +23,10 @@ on:
         type: string
         default: ''
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.client_payload != '' && fromJson(inputs.client_payload).patchSet.number || inputs.gerrit_ref }}
+  cancel-in-progress: true
+
 env:
   spdk_path: './spdk'
 jobs:
