@@ -104,6 +104,9 @@ jobs:
         container:
         - quay.io/centos/centos:9
         - quay.io/centos/centos:10
+        # - registry.access.redhat.com/ubi8/ubi
+        - registry.access.redhat.com/ubi9/ubi
+        - registry.access.redhat.com/ubi10/ubi
         - docker.io/rockylinux/rockylinux:9
         - docker.io/rockylinux/rockylinux:10
         - docker.io/library/ubuntu:20.04
