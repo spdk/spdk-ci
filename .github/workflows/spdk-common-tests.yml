@@ -333,13 +333,6 @@ jobs:
       with:
         path: ci
 
-    # TODO: Not possible to use spdk/scripts/setup.sh - uio_pci_generic, vfio-pci and other are
-    # not available in the container, making setup.sh fail. Need to add an option to setup.sh
-    # which would skip driver detection and loading, and just set up the hugepages.
-    - name: Setup hugepages
-      run: |
-        echo 4096 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-
     # ghcr.io/spdk/spdk-ci:fedora_40 is about ~10GB in size, leaving us with not much space
     # for tests after pulling the image. Reclaim some by removing features not used in SPDK tests
     # See: https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
