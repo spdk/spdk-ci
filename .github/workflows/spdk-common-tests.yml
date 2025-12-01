@@ -292,7 +292,7 @@ jobs:
       if: ${{ contains(matrix.workflow.name, 'vm') }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml guest_initialize guest_start guest_check \
+        cijoe workflows/autorun.yaml guest_initialize guest_start guest_check \
         --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.workflow.distro}}.toml \
         --output report_${{ matrix.workflow.name }}_prep_guest \
         --monitor
@@ -300,7 +300,7 @@ jobs:
     - name: qemu-guest, provision
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
+        cijoe workflows/autorun.yaml guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
         --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.workflow.distro}}.toml \
         --output report_${{ matrix.workflow.name }}_provision \
         --monitor
@@ -308,7 +308,7 @@ jobs:
     - name: qemu-guest, ${{ matrix.workflow.name }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml ${{ matrix.workflow.name }} \
+        cijoe workflows/autorun.yaml ${{ matrix.workflow.name }} \
         --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.workflow.distro}}.toml \
         --output report_${{ matrix.workflow.name }} \
         --monitor
@@ -317,7 +317,7 @@ jobs:
       if: always() && hashFiles('ci/cijoe')
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml output_listing retrieve_autorun_output \
+        cijoe workflows/autorun.yaml output_listing retrieve_autorun_output \
         --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.workflow.distro}}.toml \
         --output report_${{ matrix.workflow.name }}_cleanup \
         --monitor
@@ -326,7 +326,7 @@ jobs:
       if: ${{ contains(matrix.workflow.name, 'vm') && contains(runner.labels, 'self-hosted') || env.ACT == 'true' }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml guest_shutdown \
+        cijoe workflows/autorun.yaml guest_shutdown \
         --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.workflow.distro}}.toml \
         --output report_${{ matrix.workflow.name }}_guest_shutdown \
         --monitor
