@@ -163,21 +163,21 @@ jobs:
     strategy:
       matrix:
         workflow:
-        - {name: nvme-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: nvme-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: raid-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: raid-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: bdev-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: bdev-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: nvmf-tcp-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: nvmf-tcp-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: nvmf-tcp-uring-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: nvmf-tcp-uring-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: iscsi-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: iscsi-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: iscsi-uring-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: iscsi-uring-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
-        - {name: short-fuzz-vm-autotest, nvme_setup: "default", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
+        - {name: short-fuzz-vm-autotest, nvme_setup: "zns", distro: "fedora_40", container_image: ghcr.io/refenv/cijoe-docker:v0.9.54,
           cijoe_config_prefix: qemuhost-with-guest}
 
         include:
