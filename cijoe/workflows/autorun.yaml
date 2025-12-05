@@ -134,9 +134,17 @@ steps:
   run: |
     rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/check-so-deps-container-autotest.conf && ocf_precompile && SPDK_ABI_DIR=/opt/spdk-abi check_so_deps
 
-- name: short-fuzz-phy-autotest
+- name: short-fuzz-vm-autotest
   run: |
-    /opt/spdk/autorun.sh /opt/configs/short-fuzz-phy-autotest.conf
+    /opt/spdk/autorun.sh /opt/configs/short-fuzz-vm-autotest.conf
+
+# TODO: Figure out sudo hack.
+# Sudo doesn't work spdk/spdk-ci:fedora_40 container image, resulting in PAM errors.
+# For now work around the issue by "masking" sudo and any options (e.g. -E) passed to it.
+- name: vfio-user-container-autotest
+  run: |
+    echo "export VM_IMAGE={{ local.env.GITHUB_WORKSPACE }}/fedora_40_x86_64.qcow2" >> /opt/configs/vfio-user-container-autotest.conf
+    sudo() { "${@:2}" ; } &&  export -f sudo && /opt/spdk/autorun.sh /opt/configs/vfio-user-container-autotest.conf
 
 - name: output_listing
   run: |
