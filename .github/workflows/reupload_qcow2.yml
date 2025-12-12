@@ -68,10 +68,10 @@ jobs:
     - name: Delete previous caches
       if: env.artifact_id != ''
       run: |
-        cache_id=$(gh cache list --key "vm-image-${{ matrix.distro }}_x86_64" --json id --jq '.[].id')
+        cache_id=$(gh cache list --repo ${{ github.repository }} --key "vm-image-${{ matrix.distro }}_x86_64" --json id --jq '.[].id')
         if [[ -n "$cache_id" ]]; then
           echo "Deleting cache $cache_id for vm-image-${{ matrix.distro }}_x86_64"
-          gh cache delete $cache_id
+          gh cache delete --repo ${{ github.repository }} $cache_id
         fi
 
     - name: Cache qcow2 image
