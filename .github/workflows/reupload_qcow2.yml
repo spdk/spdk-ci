@@ -41,7 +41,7 @@ jobs:
       with:
         name: vm-image-${{matrix.distro}}_x86_64
         github-token: ${{ github.token }}
-        run-id: env.artifact_id
+        run-id: ${{ env.artifact_id }}
 
     - name: Download VM Qcow2 image from cache
       if: env.artifact_id  == ''
