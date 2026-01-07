@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         distro:
-        - fedora_40
+        - fedora_43
         - freebsd_14
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
