@@ -78,11 +78,11 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -x
-        fedora_40=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-fedora_40_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
+        fedora_43=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-fedora_43_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
         freebsd_14=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-freebsd_14_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
-        [[ -z "${fedora_40}" ]] && echo "fedora_40 is empty" && exit 1
+        [[ -z "${fedora_43}" ]] && echo "fedora_43 is empty" && exit 1
         [[ -z "${freebsd_14}" ]] && echo "freebsd_14 is empty" && exit 1
-        echo "artifact_id={'fedora_40':$fedora_40,'freebsd_14':$freebsd_14}" >> "$GITHUB_OUTPUT"
+        echo "artifact_id={'fedora_43':$fedora_43,'freebsd_14':$freebsd_14}" >> "$GITHUB_OUTPUT"
     outputs:
       artifact_id: ${{ steps.get_artifact_id.outputs.artifact_id }}
 
@@ -173,22 +173,22 @@ jobs:
         - {name: iscsi-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: iscsi-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: short-fuzz-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: check-format-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: unittest-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: unittest-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: unittest-valgrind-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: release-build-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: release-build-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: doc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: build-files-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: scan-build-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
-        - {name: check-so-deps-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_40, cijoe_config_prefix: container}
+        - {name: check-format-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: unittest-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: unittest-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: unittest-valgrind-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: release-build-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: release-build-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: doc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: build-files-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: scan-build-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: check-so-deps-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
         include:
-        - distro: "fedora_40"
+        - distro: "fedora_43"
         - nvme_setup: "zns"
         - workflow: {name: ftl-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
           nvme_setup: "ftl"
-          distro: "fedora_40"
+          distro: "fedora_43"
         - workflow: {name: freebsd-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
           nvme_setup: "default"
           distro: "freebsd_14"
@@ -217,7 +217,7 @@ jobs:
       run: |
         pip install cijoe==0.9.54
 
-    # ghcr.io/spdk/spdk-ci:fedora_40 is about ~10GB in size, leaving us with not much space
+    # ghcr.io/spdk/spdk-ci:fedora_43 is about ~10GB in size, leaving us with not much space
     # for tests after pulling the image. Reclaim some by removing features not used in SPDK tests
     # See: https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
     # Run this ONLY on self-hosted runners and make sure it's not a local GH ACT runner (these

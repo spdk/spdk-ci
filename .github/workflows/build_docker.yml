@@ -43,10 +43,9 @@ on:
         required: false
         type: choice
         options:
-        - fedora_40
         - fedora_43
         - freebsd_14
-        default: 'fedora_40'
+        default: 'fedora_43'
 
 jobs:
   select_vm_image:
