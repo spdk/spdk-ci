@@ -80,12 +80,28 @@ jobs:
         --device=/dev/fuse
         --cap-add=SYS_ADMIN
         --security-opt apparmor=unconfined
+      volumes:
+      - "/usr/share:/host-usr-share"
+      - "/usr/local:/host-usr-local"
 
     concurrency:
       group: build_docker
       cancel-in-progress: false
 
     steps:
+    # See comment in spdk-common-tests.yml for explanation why this is needed
+    - name: Cleanup runner
+      if: ${{ contains(runner.environment, 'github-hosted') }}
+      run: |
+        [[ $GITHUB_ACTOR == "nektos/act" || ACT == "true" ]] && exit 0
+        rm -rf /host-usr-share/dotnet \
+          /host-usr-local/lib/android \
+          /host-usr-local/share/edge_driver \
+          /host-usr-local/share/gecko_driver \
+          /host-usr-local/java/selenium-server.jar \
+          /host-usr-local/share/chromedriver-linux64 \
+          /host-usr-local/kotlin
+
     - name: Checkout CI repository
       uses: actions/checkout@v4.1.7
       with:
