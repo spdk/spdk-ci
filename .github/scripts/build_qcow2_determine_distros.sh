@@ -22,12 +22,12 @@ fi
 for file in "${changed_files[@]}"; do
 	case "$file" in
 		*build_qcow2.yml)
-			workflows_distros=(cijoe/workflows/build_*_qcow2_using_qemu.yaml)
+			workflows_distros=(cijoe/workflows/build_+([a-zA-Z])_+([0-9])_qcow2_using_qemu.yaml)
 			workflows_distros=("${workflows_distros[@]#*build_}")
 			workflows_distros=("${workflows_distros[@]%_qcow2*}")
 			distros_to_build+=("${workflows_distros[@]}")
 			;;
-		*qemuhost-with-guest-*.toml|*build_*qcow2_using_qemu.yaml)
+		*qemuhost-with-guest-*.toml|*build_+([a-zA-Z])_+([0-9])_qcow2_using_qemu.yaml)
 			distro=${file//@(*qemuhost-with-guest-|*build_)}
 			distro=${distro//@(.toml|_qcow2_using_qemu.yaml)}
 			distros_to_build+=("$distro")
