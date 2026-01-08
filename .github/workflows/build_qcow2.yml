@@ -132,6 +132,8 @@ jobs:
         path: ci
 
     - name: Build
+      env:
+        DISTRO: ${{ matrix.distro }}
       run: |
         cd ci/cijoe
         cijoe \
