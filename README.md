@@ -91,3 +91,17 @@ run a workflow using repository_dispatch event (example events provided in `.git
 ```
 
 for more examples, visit <https://nektosact.com/>
+
+Some of the workflow (like for example build_docker.yml or gerrit-false-positives-handler.yml) require the GitHub CLI to be installed,
+which is not included in the default act containers (e.g. catthehacker/ubuntu:act-latest). To run these workflows and not encounter
+"command not found" errors, you can use the Dockerfile in `act` directory:
+
+```bash
+docker build -t spdk-act ./act
+```
+
+and then use this image to replace the default act image during workflow execution:
+
+```bash
+gh act -P ubuntu-latest=spdk-act:latest --job build-docker  --input distro=fedora_43
+```
