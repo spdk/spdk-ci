@@ -82,7 +82,7 @@ jobs:
         freebsd_14=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-freebsd_14_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
         [[ -z "${fedora_43}" ]] && echo "fedora_43 is empty" && exit 1
         [[ -z "${freebsd_14}" ]] && echo "freebsd_14 is empty" && exit 1
-        echo "artifact_id={'fedora_43':$fedora_43,'freebsd_14':$freebsd_14}" >> "$GITHUB_OUTPUT"
+        echo "artifact_id={\"fedora_43\":$fedora_43,\"freebsd_14\":$freebsd_14}" >> "$GITHUB_OUTPUT"
     outputs:
       artifact_id: ${{ steps.get_artifact_id.outputs.artifact_id }}
 
