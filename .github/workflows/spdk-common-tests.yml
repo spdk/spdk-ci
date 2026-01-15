@@ -311,7 +311,7 @@ jobs:
         --monitor
 
     - name: qemu-guest, shutdown
-      if: ${{ contains(matrix.workflow.name, 'vm') && contains(runner.labels, 'self-hosted') || env.ACT == 'true' }}
+      if: contains(matrix.workflow.name, 'vm') && contains(runner.labels,'self-hosted') && ! contains(github.actor, 'nektos/act')
       run: |
         cd ci/cijoe
         cijoe workflows/autorun.yaml guest_shutdown \
