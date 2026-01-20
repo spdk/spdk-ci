@@ -12,6 +12,11 @@ on:
         required: false
         type: string
         default: ''
+      force_pkgdep:
+        description: 'Force pkgdep test phase to run'
+        required: true
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       client_payload:
@@ -73,16 +78,19 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -x
-        fedora_40=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-fedora_40_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
+        fedora_43=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-fedora_43_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
         freebsd_14=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-freebsd_14_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
-        [[ -z "${fedora_40}" ]] && echo "fedora_40 is empty" && exit 1
+        [[ -z "${fedora_43}" ]] && echo "fedora_43 is empty" && exit 1
         [[ -z "${freebsd_14}" ]] && echo "freebsd_14 is empty" && exit 1
-        echo "artifact_id={'fedora_40':$fedora_40,'freebsd_14':$freebsd_14}" >> "$GITHUB_OUTPUT"
+        echo "artifact_id={'fedora_43':$fedora_43,'freebsd_14':$freebsd_14}" >> "$GITHUB_OUTPUT"
     outputs:
       artifact_id: ${{ steps.get_artifact_id.outputs.artifact_id }}
 
-  distros-container:
-    if: contains(inputs.changed_files, 'pkgdep')
+  pkgdep:
+    if: |
+      contains(inputs.changed_files, 'pkgdep') ||
+      contains(inputs.changed_files, 'autotest_setup.sh') ||
+      inputs.force_pkgdep == true
     needs:
     - checkout_spdk
     strategy:
@@ -105,13 +113,15 @@ jobs:
         - docker.io/library/debian:11.11
         - docker.io/opensuse/leap:15.6
         # - docker.io/opensuse/leap:16.0
-        # - mcr.microsoft.com/azurelinux/base/core:3.0
+        - mcr.microsoft.com/azurelinux/base/core:3.0
         # - docker.io/library/archlinux:base-20250907.0.417472
         include:
         # TODO: consider also [macos-latest, windows-2022]
         - os: ubuntu-22.04-arm
           distro: ""   # no container for this one
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    env:
+      DISTRO: ${{ matrix.distro }}
     container: ${{ matrix.distro != '' && matrix.distro || null }}
     steps:
     - uses: actions/download-artifact@v4.1.8
@@ -121,6 +131,8 @@ jobs:
       run: apt-get update
     - if: matrix.distro == 'docker.io/opensuse/leap:15.6'
       run: zypper install -y tar gzip
+    - if: matrix.distro == 'mcr.microsoft.com/azurelinux/base/core:3.0'
+      run: tdnf --noplugins install -y tar
     - shell: bash
       env:
         TZ: Etc/UTC
@@ -129,7 +141,12 @@ jobs:
         set -x
         tar xzf spdk.tar.gz --strip 1
         # TODO: consider 'autorun.sh' or 'autobuild.sh' or 'autotest.sh'
-        ${{ matrix.distro == '' && 'sudo' || '' }} ./scripts/pkgdep.sh --all
+        if [[ $DISTRO =~ "fedora:43" ]]; then
+          ./test/common/config/autotest_setup.sh --install-deps \
+            --test-conf="fio,flamegraph,qemu,libiscsi,nvmecli,spdk,refspdk,lcov,bpftrace,doxygen"
+        else
+          ${{ matrix.distro == '' && 'sudo' || '' }} ./scripts/pkgdep.sh --all
+        fi
         ./configure --enable-coverage \
             --without-uring \
             --without-fio \
@@ -143,7 +160,7 @@ jobs:
         make -j
 
   autorun:
-    name: ${{ matrix.workflow }}
+    name: ${{ matrix.workflow.name }}
     needs:
     - checkout_spdk
     runs-on: ubuntu-latest
@@ -151,44 +168,75 @@ jobs:
     strategy:
       matrix:
         workflow:
-        - nvme-vm-autotest
-        - raid-vm-autotest
-        - bdev-vm-autotest
-        - nvmf-tcp-vm-autotest
-        - nvmf-tcp-uring-vm-autotest
-        - iscsi-vm-autotest
-        - iscsi-uring-vm-autotest
-        - unittest-gcc-container-autotest
-        - unittest-clang-container-autotest
-        - unittest-valgrind-container-autotest
-        - check-format-container-autotest
-        - release-build-gcc-container-autotest
-        - release-build-clang-container-autotest
-        - doc-container-autotest
-        - build-files-container-autotest
-        - scan-build-container-autotest
-        - check-so-deps-container-autotest
-        - short-fuzz-phy-autotest
+        - {name: nvme-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: raid-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: bdev-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: nvmf-tcp-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: nvmf-tcp-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: iscsi-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: iscsi-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: short-fuzz-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
+        - {name: check-format-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: unittest-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: unittest-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: unittest-valgrind-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: release-build-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: release-build-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: doc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: build-files-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: scan-build-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: check-so-deps-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
         include:
+        - distro: "fedora_43"
         - nvme_setup: "zns"
-        - distro: "fedora_40"
-        - workflow: ftl-vm-autotest
+        - workflow: {name: ftl-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
           nvme_setup: "ftl"
-          distro: "fedora_40"
-        - workflow: freebsd-vm-autotest
+          distro: "fedora_43"
+        - workflow: {name: freebsd-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
           nvme_setup: "default"
           distro: "freebsd_14"
+
     env:
       REPOSITORY_TARBALL_PATH: ${{ github.workspace }}/spdk.tar.gz
       ABI_TARBALL_PATH: ${{ github.workspace }}/spdk-abi.tar.gz
       CI_CFGS_REPOSITORY_PATH: ${{ github.workspace }}/ci/cijoe/configs/autorun_configs
       NVME_SETUP: ${{ matrix.nvme_setup }}
       DISTRO: ${{ matrix.distro }}
+
+    # TODO: Figure out how to pass volumes variable to container context
     container:
-      image: ghcr.io/refenv/cijoe-docker:v0.9.54
-      options: --device=/dev/kvm
+      image: ${{ matrix.workflow.container_image }}
+      options: --device=/dev/kvm --privileged
+      volumes:
+      - "/dev/hugepages:/dev/hugepages"
+      - "/usr/share:/host-usr-share"
+      - "/usr/local:/host-usr-local"
 
     steps:
+    # cijoe - for running cijoe workflows instead of writing own manual scrits;
+    #         TODO: Installation doesn't take long but we should bake it into the container image.
+    - name: Install cijoe
+      if: ${{ contains(matrix.workflow.name, 'container') }}
+      run: |
+        pip install cijoe==0.9.54
+
+    # ghcr.io/spdk/spdk-ci:fedora_43 is about ~10GB in size, leaving us with not much space
+    # for tests after pulling the image. Reclaim some by removing features not used in SPDK tests
+    # See: https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
+    # Run this ONLY on self-hosted runners and make sure it's not a local GH ACT runner (these
+    # identify themselves as "github-hosted" runners!)
+    - name: Cleanup runner
+      if: ${{ contains(runner.environment, 'github-hosted') }}
+      run: |
+        [[ $GITHUB_ACTOR == "nektos/act" || ACT == "true" ]] && exit 0
+        rm -rf /host-usr-share/dotnet \
+          /host-usr-local/lib/android \
+          /host-usr-local/share/edge_driver \
+          /host-usr-local/share/gecko_driver \
+          /host-usr-local/java/selenium-server.jar \
+          /host-usr-local/share/chromedriver-linux64 \
+          /host-usr-local/kotlin
+
     - name: Setup PATH
       run: |
         echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -214,6 +262,7 @@ jobs:
         tar xzf spdk-abi.tar.gz --strip 1
 
     - name: Restore qcow2 image from cache
+      if: contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')
       id: restore-qcow2
       uses: actions/cache/restore@v4
       with:
@@ -222,44 +271,54 @@ jobs:
 
     - name: Download VM Qcow2 image artifact
       uses: actions/download-artifact@v4.1.8
-      if: hashFiles(format('{0}_x86_64.qcow2', matrix.distro)) == ''
+      if: (contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')) && hashFiles(format('{0}_x86_64.qcow2',
+        matrix.distro)) == ''
       with:
         name: vm-image-${{matrix.distro}}_x86_64
         github-token: ${{ github.token }}
         run-id: ${{ fromJson(needs.checkout_spdk.outputs.artifact_id)[ matrix.distro ] }}
 
+    - name: qemu-guest, initialize
+      if: ${{ contains(matrix.workflow.name, 'vm') }}
+      run: |
+        cd ci/cijoe
+        cijoe workflows/autorun.yaml guest_initialize guest_start guest_check \
+        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
+        --output report_${{ matrix.workflow.name }}_prep_guest \
+        --monitor
+
     - name: qemu-guest, provision
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml guest_initialize guest_start guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
-        --config configs/qemuhost-with-guest-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow }}_prep_guest \
+        cijoe workflows/autorun.yaml guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
+        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
+        --output report_${{ matrix.workflow.name }}_provision \
         --monitor
 
-    - name: qemu-guest, ${{ matrix.workflow }}
+    - name: qemu-guest, ${{ matrix.workflow.name }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml ${{ matrix.workflow }} \
-        --config configs/qemuhost-with-guest-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow }} \
+        cijoe workflows/autorun.yaml ${{ matrix.workflow.name }} \
+        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
+        --output report_${{ matrix.workflow.name }} \
         --monitor
 
     - name: qemu-guest, cleanup
-      if: always()
+      if: always() && hashFiles('ci/cijoe')
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml output_listing retrieve_autorun_output \
-        --config configs/qemuhost-with-guest-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow }}_cleanup \
+        cijoe workflows/autorun.yaml output_listing retrieve_autorun_output \
+        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
+        --output report_${{ matrix.workflow.name }}_cleanup \
         --monitor
 
     - name: qemu-guest, shutdown
-      if: contains(runner.labels, 'self-hosted') || env.ACT == 'true'
+      if: ${{ contains(matrix.workflow.name, 'vm') && contains(runner.labels, 'self-hosted') || env.ACT == 'true' }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun_in_qemu.yaml guest_shutdown \
-        --config configs/qemuhost-with-guest-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow }}_guest_shutdown \
+        cijoe workflows/autorun.yaml guest_shutdown \
+        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
+        --output report_${{ matrix.workflow.name }}_guest_shutdown \
         --monitor
 
     - name: Upload Artifacts
@@ -267,14 +326,14 @@ jobs:
       if: always()
       with:
         path: /tmp/autorun_output
-        name: common-job-${{ matrix.workflow }}
+        name: common-job-${{ matrix.workflow.name }}
 
     - name: Upload Report
       uses: actions/upload-artifact@v4.4.0
       if: always()
       with:
         path: |
-          ci/cijoe/report_${{ matrix.workflow }}
-          ci/cijoe/report_${{ matrix.workflow }}_cleanup
-          ci/cijoe/report_${{ matrix.workflow }}_prep_guest
-        name: common-cijoe-${{ matrix.workflow }}
+          ci/cijoe/report_${{ matrix.workflow.name }}
+          ci/cijoe/report_${{ matrix.workflow.name }}_cleanup
+          ci/cijoe/report_${{ matrix.workflow.name }}_prep_guest
+        name: common-cijoe-${{ matrix.workflow.name }}

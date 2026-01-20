@@ -29,13 +29,13 @@ steps:
 - name: diskimage_from_cloudimage
   uses: system_imaging.diskimage_from_cloudimage
   with:
-    pattern: "fedora_40-x86_64"
+    pattern: "{{ local.env.DISTRO }}-x86_64"
 
 - name: guest_initialize
   uses: qemu.guest_initialize
   with:
     guest_name: generic-bios-kvm-x86_64
-    system_image_name: fedora_40-x86_64
+    system_image_name: "{{ local.env.DISTRO }}-x86_64"
 
 - name: guest_start
   uses: qemu.guest_start
@@ -48,7 +48,7 @@ steps:
     uname -a
     df -h
     growpart /dev/vda 4 || true
-    btrfs filesystem resize 10G / || true
+    btrfs filesystem resize max / || true
     df -h
 
 - name: guest_update
@@ -77,7 +77,7 @@ steps:
   run: |
     /tmp/spdk/scripts/pkgdep.sh -a
     mkdir /tmp/git_repos
-    /tmp/spdk/test/common/config/autotest_setup.sh --install-deps --upgrade --dir-git="/tmp/git_repos" --test-conf="lcov,flamegraph,fio,nvmecli,bpftrace,qemu"
+    /tmp/spdk/test/common/config/autotest_setup.sh --install-deps --upgrade --dir-git="/tmp/git_repos" --test-conf="lcov,flamegraph,fio,nvmecli,bpftrace,qemu,doxygen"
     rm -r /tmp/git_repos
 
 - name: guest_shutdown
