@@ -124,7 +124,7 @@ jobs:
     - uses: actions/download-artifact@v4.1.8
       with:
         name: repo-spdk
-    - if: contains(matrix.distro, 'ubuntu') || contains(matrix.distro, 'debian')
+    - if: contains(matrix.distro, 'ubuntu') || contains(matrix.distro, 'debian') || contains(matrix.os, 'ubuntu-22.04-arm')
       run: apt-get update
     - if: matrix.distro == 'docker.io/opensuse/leap:15.6'
       run: zypper install -y tar gzip
