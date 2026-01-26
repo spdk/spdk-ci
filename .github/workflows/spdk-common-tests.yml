@@ -125,7 +125,7 @@ jobs:
       with:
         name: repo-spdk
     - if: contains(matrix.distro, 'ubuntu') || contains(matrix.distro, 'debian') || contains(matrix.os, 'ubuntu-22.04-arm')
-      run: apt-get update
+      run: ${{ matrix.distro == '' && 'sudo' || '' }} apt-get update
     - if: matrix.distro == 'docker.io/opensuse/leap:15.6'
       run: zypper install -y tar gzip
     - if: matrix.distro == 'mcr.microsoft.com/azurelinux/base/core:3.0'
