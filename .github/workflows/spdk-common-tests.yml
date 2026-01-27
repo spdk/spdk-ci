@@ -173,17 +173,17 @@ jobs:
         - {name: iscsi-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: iscsi-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: short-fuzz-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: vfio-user-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: check-format-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: unittest-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: unittest-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: unittest-valgrind-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: release-build-gcc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: release-build-clang-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: doc-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: build-files-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: scan-build-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
-        - {name: check-so-deps-container-autotest, container_image: ghcr.io/spdk/spdk-ci:fedora_43, cijoe_config_prefix: container}
+        - {name: vfio-user-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: check-format-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: unittest-gcc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: unittest-clang-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: unittest-valgrind-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: release-build-gcc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: release-build-clang-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: doc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: build-files-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: scan-build-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: check-so-deps-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         include:
         - distro: "fedora_43"
         - nvme_setup: "zns"
