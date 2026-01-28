@@ -73,6 +73,7 @@ jobs:
       # "Client payload" is all of the information Gerrit webhooks sends out.
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
       changed_files: $${{ needs.patch_set_status.outputs.changed_files }}
+      force_pkgdep: $${{ github.event_name == 'pull_request' }}
 
   hpe:
     name: NVMe-oF RDMA tests
