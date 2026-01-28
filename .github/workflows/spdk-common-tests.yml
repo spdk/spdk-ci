@@ -27,6 +27,11 @@ on:
         required: false
         type: string
         default: ''
+      force_pkgdep:
+        description: 'Force pkgdep test phase to run'
+        required: true
+        type: boolean
+        default: false
 
 env:
   spdk_path: './spdk'
