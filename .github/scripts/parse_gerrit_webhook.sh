@@ -30,7 +30,7 @@ if ((current_patch_set != PATCH_SET)); then
 fi
 
 # Test only changes without a Verified vote already present
-verified=$(jq -r ".labels.Verified.all[]? | select(.username==\"${GERRIT_BOT_USER}\").value" change.json)
+verified=$(jq -r ".labels.Verified.all[]? | select(.username==\"${GERRIT_BOT_USER}\") | .value // 0" change.json)
 if [[ $verified != 0 ]]; then
     echo "Ignore. Patch already has a vote from CI." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
