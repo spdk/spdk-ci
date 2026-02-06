@@ -5,11 +5,18 @@ import os
 import json
 import requests
 import logging
+import re
 
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_ACTION_URL = os.getenv("GITHUB_ACTION_URL")
+
+# This matches the pattern used in parse_false_positive_comment.sh
+FALSE_POSITIVE_PATTERN = re.compile(
+    r"patch set \d+:\n\nfalse positive:\s*#?\d+$",
+    re.IGNORECASE
+)
 
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -20,13 +27,24 @@ class WebhookHandler(BaseHTTPRequestHandler):
         payload = json.loads(post_data.decode('utf-8'))
         logging.info(f"Request Body: {post_data.decode('utf-8')}")
 
+        event_type = payload.get("type")
+
+        # Filter comment-added events: only forward if comment matches false positive pattern
+        if event_type == "comment-added":
+            comment = payload.get("comment", "")
+            if not comment or not FALSE_POSITIVE_PATTERN.search(comment):
+                logging.info("Ignoring comment-added event: comment does not match false positive pattern")
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'Webhook received')
+                return
 
         headers = {
             "Authorization": f"Bearer {GITHUB_TOKEN}",
             "Accept": "application/vnd.github+json",
         }
         body = {
-            "event_type": payload["type"],
+            "event_type": event_type,
             "client_payload": payload
         }
 
