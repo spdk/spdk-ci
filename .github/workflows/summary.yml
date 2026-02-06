@@ -48,6 +48,10 @@ jobs:
     - name: Post process artifacts from jobs
       id: autorun_post
       run: |
+        # Hack: lcov complains when aggregating coverage when freebsd artifacts are present.
+        # This is __possibly__ due to freebsd running with older, 1.x lcov version
+        rm -rf _autorun_summary/*freebsd-vm-autotest
+
         ./spdk/autorun_post.py -d ./_autorun_summary -r ./spdk
         echo "result=success" >> "$GITHUB_OUTPUT"
 
