@@ -65,7 +65,9 @@ jobs:
 
   report:
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    # ubuntu-22.04-arm is used on purpose; it has separate queue, so those jobs can start immeditely
+    # and the billing is exactly the same as x86 ubuntu runner (unlike macos or windows) so penalty is zero
+    runs-on: ubuntu-22.04-arm
     needs: merge_outputs
     steps:
     - name: Vote count from workflows
