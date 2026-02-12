@@ -18,7 +18,9 @@ jobs:
     # 22.04 used on purpose; it has lcov+gcov versions that are compatible with what
     # is used in cijoe's Fedora 40 images. Using lcov+gcov from ubuntu-latest results
     # in warnings and/or failures.
-    runs-on: ubuntu-22.04
+    # ARM is used on purpose; it has separate queue, so those jobs can start immeditely
+    # and the billing is exactly the same as x86 ubuntu runner (unlike macos or windows) so penalty is zero
+    runs-on: ubuntu-22.04-arm
     steps:
     - name: Download the SPDK repository
       uses: actions/download-artifact@v4.1.8
