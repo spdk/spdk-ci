@@ -137,7 +137,11 @@ jobs:
     - if: contains(matrix.container, 'ubuntu') || contains(matrix.container, 'debian') || contains(matrix.os, 'ubuntu-22.04-arm')
       run: ${{ matrix.container == '' && 'sudo' || '' }} apt-get update
     - if: matrix.container == 'docker.io/opensuse/leap:15.6'
-      run: zypper install -y tar gzip
+      run: |
+        set -x
+        zypper install -y tar gzip
+        zypper install -y python39 python3-tabulate python3-Jinja2
+        ln -sfn /usr/bin/python3.9 /usr/bin/python3
     - if: matrix.container == 'mcr.microsoft.com/azurelinux/base/core:3.0'
       run: tdnf --noplugins install -y tar
     - if: matrix.container == 'docker.io/library/ubuntu:20.04'
