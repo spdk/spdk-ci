@@ -140,6 +140,14 @@ jobs:
       run: zypper install -y tar gzip
     - if: matrix.container == 'mcr.microsoft.com/azurelinux/base/core:3.0'
       run: tdnf --noplugins install -y tar
+    - if: matrix.container == 'docker.io/library/ubuntu:20.04'
+      run: |
+        set -x
+        apt install -y python3.9 python3.9-venv python3-pip python3.9-dev
+        ln -sfn /usr/bin/python3.9 /usr/bin/python3
+      env:
+        TZ: Etc/UTC
+        DEBIAN_FRONTEND: noninteractive
     - shell: bash
       env:
         TZ: Etc/UTC
