@@ -8,7 +8,11 @@ on:
         required: false
         type: string
         default: ''
-      result:
+      result_common:
+        required: true
+        type: string
+        default: 'failure'
+      result_hpe:
         required: true
         type: string
         default: 'failure'
@@ -75,14 +79,18 @@ jobs:
     - name: Vote count from workflows
       id: vote_count
       run: |
-        vote="-1"
-        message="Build failed. "
-
-        # Combine results from jobs and autorun_post.py
-        if [[ "${{ inputs.result }}" == "success" && \
-                "${{ needs.merge_outputs.outputs.result }}" == "success" ]]; then
+        set -x
+        if [[ "${{ inputs.result_common }}" == "cancelled" || "${{ inputs.result_hpe }}" == "cancelled" ]]; then
+            vote="0"
+            message="Build cancelled. "
+        elif [[ "${{ inputs.result_common }}" == "success" && \
+                "${{ needs.merge_outputs.outputs.result }}" == "success" && \
+              ( "${{ inputs.result_hpe }}" == "success" || "${{ inputs.result_hpe }}" == "skipped" ) ]]; then
             vote="1"
             message="Build successful. "
+        else
+            vote="-1"
+            message="Build failed. "
         fi
 
         message+="Results: [${{ github.run_id }}/${{ github.run_attempt }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }})"
