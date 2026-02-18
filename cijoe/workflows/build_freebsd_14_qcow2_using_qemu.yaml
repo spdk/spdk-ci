@@ -58,7 +58,7 @@ steps:
 
 - name: guest_update
   run: |
-    pkg install -y git
+    pkg install -y git nodejs
 
 - name: kernel_src
   run: |
