@@ -184,6 +184,7 @@ jobs:
         - {name: iscsi-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: short-fuzz-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: vfio-user-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: nvmf-no-huge-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: check-format-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: unittest-gcc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: unittest-clang-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
@@ -224,7 +225,7 @@ jobs:
     # cijoe - for running cijoe workflows instead of writing own manual scrits;
     #         TODO: Installation doesn't take long but we should bake it into the container image.
     - name: Install cijoe
-      if: ${{ contains(matrix.workflow.name, 'container') }}
+      if: ${{ contains(matrix.workflow.name, '-container-') }}
       run: |
         pip install cijoe==0.9.54
 
@@ -270,7 +271,7 @@ jobs:
         tar xzf spdk-abi.tar.gz --strip 1
 
     - name: Restore qcow2 image from cache
-      if: contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')
+      if: contains(matrix.workflow.name, '-vm-')  || contains(matrix.workflow.name, 'vfio-user')
       id: restore-qcow2
       uses: actions/cache/restore@v4
       with:
@@ -279,7 +280,7 @@ jobs:
 
     - name: Download VM Qcow2 image artifact
       uses: actions/download-artifact@v4.1.8
-      if: (contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')) && hashFiles(format('{0}_x86_64.qcow2',
+      if: (contains(matrix.workflow.name, '-vm-')  || contains(matrix.workflow.name, 'vfio-user')) && hashFiles(format('{0}_x86_64.qcow2',
         matrix.distro)) == ''
       with:
         name: vm-image-${{matrix.distro}}_x86_64
@@ -287,7 +288,7 @@ jobs:
         run-id: ${{ fromJson(needs.checkout_spdk.outputs.artifact_id)[ matrix.distro ] }}
 
     - name: qemu-guest, initialize
-      if: ${{ contains(matrix.workflow.name, 'vm') }}
+      if: ${{ contains(matrix.workflow.name, '-vm-') }}
       run: |
         cd ci/cijoe
         cijoe workflows/autorun.yaml guest_initialize guest_start guest_check \
@@ -321,7 +322,7 @@ jobs:
         --monitor
 
     - name: qemu-guest, shutdown
-      if: ${{ contains(matrix.workflow.name, 'vm') && contains(runner.labels, 'self-hosted') || env.ACT == 'true' }}
+      if: ${{ contains(matrix.workflow.name, '-vm-') && contains(runner.labels, 'self-hosted') || env.ACT == 'true' }}
       run: |
         cd ci/cijoe
         cijoe workflows/autorun.yaml guest_shutdown \

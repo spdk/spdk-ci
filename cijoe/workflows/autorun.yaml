@@ -94,6 +94,10 @@ steps:
     ln -sfn /usr/local/bin/perl /usr/bin/perl
     USE_INSTALLED_CONTIGMEM=yes SKIP_HUGE=yes TEST_MIN_STORAGE_SIZE=0 SYSDIR="{{ local.env.HOME }}/git/freebsd/sys" /opt/spdk/autorun.sh /opt/configs/freebsd-vm-autotest.conf
 
+- name: nvmf-no-huge-container-autotest
+  run: |
+    /opt/spdk/autorun.sh /opt/configs/nvmf-no-huge-container-autotest.conf
+
 - name: unittest-gcc-container-autotest
   run: |
     rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/unittest-gcc-container-autotest.conf && ocf_precompile && unittest_build && ./test/unit/unittest.sh
