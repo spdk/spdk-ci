@@ -50,3 +50,9 @@ jobs:
       with:
         path: ./output
         name: hpe-job-nvmf-rdma
+    - name: Cancel all jobs enitre workflow run if this job failed
+      if: failure()
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
