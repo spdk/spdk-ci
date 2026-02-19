@@ -6,19 +6,19 @@ services:
     container_name: gerrit
     restart: always
     volumes:
-    - ./gerrit_dir/cache:/var/gerrit/cache
-    - ./gerrit_dir/data:/var/gerrit/data
-    - ./gerrit_dir/db:/var/gerrit/db
-    - ./gerrit_dir/etc:/var/gerrit/etc
-    - ./gerrit_dir/events-db:/var/gerrit/events-db
-    - ./gerrit_dir/git:/var/gerrit/git
-    - ./gerrit_dir/index:/var/gerrit/index
-    - ./gerrit_dir/lib:/var/gerrit/lib
-    - ./gerrit_dir/logs:/var/gerrit/logs
-    - ./gerrit_dir/plugins:/var/gerrit/plugins
-    - ./gerrit_dir/static:/var/gerrit/static
-    - ./gerrit_dir/tmp:/var/gerrit/tmp
-    - ./gerrit_dir/.ssh:/var/gerrit/.ssh
+    - ${GERRIT_DIR}/cache:/var/gerrit/cache
+    - ${GERRIT_DIR}/data:/var/gerrit/data
+    - ${GERRIT_DIR}/db:/var/gerrit/db
+    - ${GERRIT_DIR}/etc:/var/gerrit/etc
+    - ${GERRIT_DIR}/events-db:/var/gerrit/events-db
+    - ${GERRIT_DIR}/git:/var/gerrit/git
+    - ${GERRIT_DIR}/index:/var/gerrit/index
+    - ${GERRIT_DIR}/lib:/var/gerrit/lib
+    - ${GERRIT_DIR}/logs:/var/gerrit/logs
+    - ${GERRIT_DIR}/plugins:/var/gerrit/plugins
+    - ${GERRIT_DIR}/static:/var/gerrit/static
+    - ${GERRIT_DIR}/tmp:/var/gerrit/tmp
+    - ${GERRIT_DIR}/.ssh:/var/gerrit/.ssh
     environment:
     - CANONICAL_WEB_URL=${GERRIT_CANONICAL_WEB_URL}
     ports:
