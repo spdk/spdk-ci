@@ -18,6 +18,7 @@ services:
     - ./gerrit_dir/plugins:/var/gerrit/plugins
     - ./gerrit_dir/static:/var/gerrit/static
     - ./gerrit_dir/tmp:/var/gerrit/tmp
+    - ./gerrit_dir/.ssh:/var/gerrit/.ssh
     environment:
     - CANONICAL_WEB_URL=${GERRIT_CANONICAL_WEB_URL}
     ports:
