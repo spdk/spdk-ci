@@ -5,6 +5,19 @@ services:
     image: gerritcodereview/gerrit:3.13.3
     container_name: gerrit
     restart: always
+    volumes:
+    - ./gerrit_dir/cache:/var/gerrit/cache
+    - ./gerrit_dir/data:/var/gerrit/data
+    - ./gerrit_dir/db:/var/gerrit/db
+    - ./gerrit_dir/etc:/var/gerrit/etc
+    - ./gerrit_dir/events-db:/var/gerrit/events-db
+    - ./gerrit_dir/git:/var/gerrit/git
+    - ./gerrit_dir/index:/var/gerrit/index
+    - ./gerrit_dir/lib:/var/gerrit/lib
+    - ./gerrit_dir/logs:/var/gerrit/logs
+    - ./gerrit_dir/plugins:/var/gerrit/plugins
+    - ./gerrit_dir/static:/var/gerrit/static
+    - ./gerrit_dir/tmp:/var/gerrit/tmp
     environment:
     - CANONICAL_WEB_URL=${GERRIT_CANONICAL_WEB_URL}
     ports:
@@ -49,7 +62,6 @@ services:
     - gerrit
 
 volumes:
-  gerrit_data:
   forwarder_logs:
   mergable_changes_logs:
   mergable_changes_out:
