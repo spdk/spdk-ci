@@ -23,7 +23,7 @@ services:
     environment:
     - GITHUB_TOKEN=${GITHUB_TOKEN}
     - GITHUB_ACTION_URL=${GITHUB_ACTION_URL}
-    - TEST_MODE=${TEST_MODE}
+    - TEST_MODE=${FORWARDER_TEST_MODE}
     depends_on:
     - gerrit
     volumes:
@@ -39,7 +39,7 @@ services:
     container_name: mergable_changes
     restart: always
     environment:
-    - OUTPUT_DIR=${OUTPUT_DIR}
+    - OUTPUT_DIR=${MERGABLE_CHANGES_OUTPUT_DIR}
     depends_on:
     - gerrit
     volumes:
