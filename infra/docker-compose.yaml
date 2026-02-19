@@ -6,7 +6,7 @@ services:
     container_name: gerrit
     restart: always
     environment:
-    - CANONICAL_WEB_URL=http://127.0.0.1:8080
+    - CANONICAL_WEB_URL=${GERRIT_CANONICAL_WEB_URL}
     ports:
     - "29418:29418"
     - "8080:8080"
