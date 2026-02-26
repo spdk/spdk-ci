@@ -97,7 +97,6 @@ jobs:
     uses: ./.github/workflows/summary.yml
     with:
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
-      result: >-
-        ${{ (needs.common.result == 'success' && (needs.hpe.result == 'success' || needs.hpe.result == 'skipped')) &&
-        'success' || 'failure' }}
+      result_common: ${{ (needs.common.result }}
+      result_hpe: ${{ (needs.hpe.result }}
     secrets: inherit
