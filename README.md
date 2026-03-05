@@ -6,6 +6,8 @@
 **DISCLAIMER: This repository is an area of very active development.
 Outdated documentation and breaking changes might occur.**
 
+TEST
+
 The SPDK CI repository contains workflows and actions responsible for
 test execution. The actual test scripts (e.g., `autotest.sh`) and test
 environment preparation scripts (e.g., `autotest_setup.sh`, `pkgdep.sh`)
