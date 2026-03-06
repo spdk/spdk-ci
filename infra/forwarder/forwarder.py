@@ -2,6 +2,7 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
+from datetime import datetime, timedelta, timezone
 import os
 import json
 import requests
@@ -21,14 +22,11 @@ GITHUB_WORKFLOW_RUNS_URL = f"{GITHUB_REPO_URL}/actions/workflows/gerrit-webhook-
 QUEUE_PROCESS_INTERVAL = int(os.getenv("QUEUE_PROCESS_INTERVAL", "60"))
 MAX_RUNNING_WORKFLOWS = int(os.getenv("MAX_RUNNING_WORKFLOWS", "3"))
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/output")
+GERRIT_URL = os.getenv("GERRIT_URL", "https://review.spdk.io")
+RECOVERY_WINDOW_DAYS = int(os.getenv("RECOVERY_WINDOW_DAYS", "7"))
+GERRIT_QUERY_LIMIT = int(os.getenv("GERRIT_QUERY_LIMIT", "300"))
 
 event_queue: queue.Queue[dict[str, Any]] = queue.Queue()
-
-# This matches the pattern used in parse_false_positive_comment.sh
-FALSE_POSITIVE_PATTERN = re.compile(
-    r"patch set \d+:\n\nfalse positive:\s*#?\d+$",
-    re.IGNORECASE
-)
 
 def post_event_to_github(event_type, payload):
     headers = {
@@ -40,11 +38,22 @@ def post_event_to_github(event_type, payload):
         "client_payload": payload
     }
 
-    if not TEST_MODE:
-        response = requests.post(GITHUB_DISPATCH_URL, headers=headers, json=body)
-        logging.info(f"GitHub Action Trigger Response: {response.status_code} {response.text}")
-    else:
+    if TEST_MODE:
         logging.info("Test mode; not forwarding to GitHub Actions.")
+        return True
+
+    try:
+        response = requests.post(GITHUB_DISPATCH_URL, headers=headers, json=body)
+    except requests.RequestException as exc:
+        logging.warning(f"GitHub action trigger failed with request error: {exc}")
+        return False
+
+    if 200 <= response.status_code < 300:
+        logging.info(f"GitHub Action Trigger Response: {response.status_code} {response.text}")
+        return True
+
+    logging.warning(f"GitHub Action Trigger failed: {response.status_code} {response.text}")
+    return False
 
 def get_active_workflow_count():
     headers = {
@@ -89,6 +98,162 @@ def write_queue_snapshot(pending_events):
     with open(os.path.join(OUTPUT_DIR, "queue_status.html"), "w") as f:
         f.write(html)
 
+
+def _parse_gerrit_timestamp_to_unix(timestamp):
+    """Parse Gerrit REST timestamp (e.g. "2025-01-15 10:30:00.000000000") to Unix epoch int."""
+    if not timestamp:
+        return None
+    try:
+        return int(datetime.fromisoformat(timestamp).timestamp())
+    except Exception:
+        logging.warning(f"Failed to parse Gerrit timestamp: {timestamp}")
+        return None
+
+
+def _get_current_revision(change):
+    """Extract the current revision dict from a Gerrit change object."""
+    revisions = change.get("revisions")
+    if not isinstance(revisions, dict):
+        return None
+    current_revision = change.get("current_revision")
+    if not current_revision:
+        return None
+    current_revision_data = revisions.get(current_revision)
+    if not isinstance(current_revision_data, dict):
+        return None
+    return current_revision_data
+
+
+def query_gerrit_for_recovery():
+    """Query Gerrit REST API for open changes without a Verified label."""
+    query = (
+        "project:spdk/spdk status:open -is:wip -is:private "
+        "-label:Verified<0 -label:Verified>0 "
+        f"-age:{RECOVERY_WINDOW_DAYS}d"
+    )
+    params = {
+        "q": query,
+        "o": "CURRENT_REVISION",
+        "n": GERRIT_QUERY_LIMIT,
+    }
+    url = f"{GERRIT_URL}/changes/"
+
+    try:
+        response = requests.get(url, params=params)
+    except requests.RequestException as exc:
+        logging.warning(f"Error querying Gerrit: {exc}")
+        return []
+
+    if response.status_code != 200:
+        logging.warning(f"Error querying Gerrit: HTTP {response.status_code} {response.text}")
+        return []
+
+    if not response.text:
+        return []
+
+    # Skip the XSSI prevention prefix added by Gerrit.
+    body = response.text.split(maxsplit=1).pop()
+
+    try:
+        changes = json.loads(body)
+    except json.JSONDecodeError as exc:
+        logging.warning(f"Failed to parse Gerrit response: {exc}")
+        return []
+
+    if not isinstance(changes, list):
+        logging.warning("Unexpected Gerrit response format; expected list of changes.")
+        return []
+
+    return changes
+
+
+def list_recoverable_changes():
+    """Filter Gerrit query results to changes whose current patchset was created within RECOVERY_WINDOW_DAYS."""
+    cutoff_epoch = int((datetime.now(timezone.utc) - timedelta(days=RECOVERY_WINDOW_DAYS)).timestamp())
+    recovered = []
+
+    for change in query_gerrit_for_recovery():
+        if not isinstance(change, dict):
+            continue
+        current_revision_data = _get_current_revision(change)
+        if not current_revision_data:
+            continue
+        patchset_created = _parse_gerrit_timestamp_to_unix(current_revision_data.get("created"))
+        if patchset_created is None:
+            continue
+        if patchset_created >= cutoff_epoch:
+            recovered.append(change)
+
+    return recovered
+
+
+def build_recovery_event(change):
+    """Build a minimal fake patchset-created event from a Gerrit REST API change object."""
+    current_revision_data = _get_current_revision(change)
+    if not current_revision_data:
+        return None
+
+    patchset_created = _parse_gerrit_timestamp_to_unix(current_revision_data.get("created"))
+    if patchset_created is None:
+        return None
+
+    try:
+        patchset_number = int(current_revision_data.get("_number"))
+        change_number = int(change.get("_number"))
+    except Exception:
+        return None
+    patchset_ref = current_revision_data.get("ref")
+    subject = change.get("subject")
+
+    if not all([patchset_ref, subject]):
+        return None
+
+    # Extend the fields below if GitHub workflows start using them
+    return {
+        "type": "patchset-created",
+        "change_number": change_number,
+        "payload": {
+            "type": "patchset-created",
+            "change": {
+                "number": change_number,
+                "subject": subject,
+            },
+            "patchSet": {
+                "number": patchset_number,
+                "ref": patchset_ref,
+                "createdOn": patchset_created,
+            },
+        },
+    }
+
+
+def get_active_workflow_changes():
+    """Return a set of (change_number, patchset_number) for active workflow runs."""
+    # Matches run-name pattern "(12345/5)Subject" from gerrit-webhook-handler.yml
+    display_title_re = re.compile(r"^\((\d+)/(\d+)\)")
+
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+    active = set()
+    for status in ("in_progress", "waiting", "queued"):
+        try:
+            response = requests.get(
+                GITHUB_WORKFLOW_RUNS_URL, headers=headers,
+                params={"status": status, "per_page": 100})
+            if response.status_code != 200:
+                logging.warning(f"Failed to query workflow runs (status={status}): {response.status_code}")
+                continue
+            for run in response.json().get("workflow_runs", []):
+                m = display_title_re.search(run.get("display_title", ""))
+                if m:
+                    active.add((int(m.group(1)), int(m.group(2))))
+        except requests.RequestException as exc:
+            logging.warning(f"Error querying workflow runs (status={status}): {exc}")
+    return active
+
+
 def process_queue():
     pending_events: dict[int, dict[str, Any]] = {}
 
@@ -113,9 +278,10 @@ def process_queue():
                 for change_number in list(pending_events):
                     if to_send <= 0:
                         break
-                    event_data = pending_events.pop(change_number)
-                    post_event_to_github(event_data["type"], event_data["payload"])
-                    to_send -= 1
+                    event_data = pending_events[change_number]
+                    if post_event_to_github(event_data["type"], event_data["payload"]):
+                        del pending_events[change_number]
+                        to_send -= 1
 
         write_queue_snapshot(pending_events)
 
@@ -137,8 +303,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         # Filter comment-added events: only forward if comment matches false positive pattern
         if event_type == "comment-added":
+            # This matches the pattern used in parse_false_positive_comment.sh
+            false_positive_pattern = re.compile(
+                r"patch set \d+:\n\nfalse positive:\s*#?\d+$",
+                re.IGNORECASE
+            )
             comment = payload.get("comment", "")
-            if not comment or not FALSE_POSITIVE_PATTERN.search(comment):
+            if not comment or not false_positive_pattern.search(comment):
                 logging.info("Ignoring comment-added event: comment does not match false positive pattern")
             else:
                 post_event_to_github(event_type, payload)
@@ -169,6 +340,21 @@ if __name__ == "__main__":
     if not GITHUB_TOKEN or not GITHUB_REPO_URL:
         logging.error("Error: GITHUB_TOKEN or GITHUB_REPO_URL environment variable is not set.")
         exit(1)
+
+    try:
+        changes = list_recoverable_changes()
+        events = [e for c in changes if (e := build_recovery_event(c))]
+        events.sort(key=lambda e: e["payload"]["patchSet"]["createdOn"])
+
+        active = get_active_workflow_changes()
+        events = [e for e in events
+                  if (e["change_number"], e["payload"]["patchSet"]["number"]) not in active]
+
+        for event in events:
+            event_queue.put(event)
+        logging.info(f"Recovery: enqueued {len(events)} events from Gerrit")
+    except Exception as exc:
+        logging.warning(f"Recovery failed (continuing startup): {exc}")
 
     queue_thread = threading.Thread(target=process_queue, daemon=True)
     queue_thread.start()
