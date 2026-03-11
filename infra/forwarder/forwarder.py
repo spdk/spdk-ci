@@ -13,28 +13,51 @@ import threading
 import time
 import queue
 import jinja2
+from collections import deque
 
-TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "https://api.github.com/repos/spdk/spdk-ci")
+TEST_MODE = (os.getenv("TEST_MODE") or "false").lower() == "true"
+LOG_LEVEL = (os.getenv("LOG_LEVEL") or "INFO").upper()
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") or None
+GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL") or "https://api.github.com/repos/spdk/spdk-ci"
 GITHUB_DISPATCH_URL = f"{GITHUB_REPO_URL}/dispatches"
 GITHUB_WORKFLOW_RUNS_URL = f"{GITHUB_REPO_URL}/actions/workflows/gerrit-webhook-handler.yml/runs"
-QUEUE_PROCESS_INTERVAL = int(os.getenv("QUEUE_PROCESS_INTERVAL", "60"))
-MAX_RUNNING_WORKFLOWS = int(os.getenv("MAX_RUNNING_WORKFLOWS", "3"))
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/output")
-GERRIT_URL = os.getenv("GERRIT_URL", "https://review.spdk.io")
-RECOVERY_WINDOW_DAYS = int(os.getenv("RECOVERY_WINDOW_DAYS", "7"))
-GERRIT_QUERY_LIMIT = int(os.getenv("GERRIT_QUERY_LIMIT", "300"))
-gerrit = GerritRestAPI(url=GERRIT_URL)
+QUEUE_PROCESS_INTERVAL = int(os.getenv("QUEUE_PROCESS_INTERVAL") or "60")
+MAX_RUNNING_WORKFLOWS = int(os.getenv("MAX_RUNNING_WORKFLOWS") or "3")
+OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "/output"
+GERRIT_URL = os.getenv("GERRIT_URL") or "https://review.spdk.io"
+RECOVERY_WINDOW_DAYS = int(os.getenv("RECOVERY_WINDOW_DAYS") or "7")
+GERRIT_QUERY_LIMIT = int(os.getenv("GERRIT_QUERY_LIMIT") or "300")
+# Matches run-name pattern "(12345/5)Subject" from gerrit-webhook-handler.yml
+DISPLAY_TITLE_RE = re.compile(r"^\((\d+)/(\d+)\)(.*)")
 
 event_queue: queue.Queue[dict[str, Any]] = queue.Queue()
 
-def post_event_to_github(event_type, payload):
-    headers = {
+
+def _github_headers():
+    return {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
     }
+
+
+def _get_workflow_runs():
+    """Fetch all active workflow runs (in_progress, waiting, queued) from GitHub."""
+    runs = []
+    for status in ("in_progress", "waiting", "queued"):
+        try:
+            response = requests.get(
+                GITHUB_WORKFLOW_RUNS_URL, headers=_github_headers(),
+                params={"status": status, "per_page": 100})
+            if response.status_code == 200:
+                runs.extend(response.json().get("workflow_runs", []))
+            else:
+                logging.warning(f"Failed to query workflow runs (status={status}): {response.status_code}")
+        except requests.RequestException as exc:
+            logging.warning(f"Error querying workflow runs (status={status}): {exc}")
+    return runs
+
+
+def post_event_to_github(event_type, payload):
     body = {
         "event_type": event_type,
         "client_payload": payload
@@ -45,7 +68,7 @@ def post_event_to_github(event_type, payload):
         return True
 
     try:
-        response = requests.post(GITHUB_DISPATCH_URL, headers=headers, json=body)
+        response = requests.post(GITHUB_DISPATCH_URL, headers=_github_headers(), json=body)
     except requests.RequestException as exc:
         logging.warning(f"GitHub action trigger failed with request error: {exc}")
         return False
@@ -57,42 +80,65 @@ def post_event_to_github(event_type, payload):
     logging.warning(f"GitHub Action Trigger failed: {response.status_code} {response.text}")
     return False
 
-def get_active_workflow_count():
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
-    count = 0
-    for status in ("in_progress", "waiting", "queued"):
-        try:
-            response = requests.get(
-                GITHUB_WORKFLOW_RUNS_URL, headers=headers,
-                params={"status": status})
-            if response.status_code == 200:
-                count += response.json().get("total_count", 0)
-            else:
-                logging.warning(f"Failed to query workflow runs (status={status}): {response.status_code}")
-        except requests.RequestException as e:
-            logging.warning(f"Error querying workflow runs (status={status}): {e}")
-    return count
 
-def write_queue_snapshot(pending_events):
+def get_active_workflow_count():
+    return len(_get_workflow_runs())
+
+
+def _build_in_progress_rows():
+    """Build status page rows for workflows currently running on GitHub."""
     rows = []
-    for change_number, event_data in pending_events.items():
+    for run in _get_workflow_runs():
+        m = DISPLAY_TITLE_RE.search(run.get("display_title", ""))
+        if not m:
+            continue
+        change_number = int(m.group(1))
+        rows.append({
+            "change_url": f"{GERRIT_URL}/c/spdk/spdk/+/{change_number}",
+            "change_number": change_number,
+            "patchset_number": int(m.group(2)),
+            "subject": m.group(3).strip(),
+            "status": "In Progress",
+            "run_url": run.get("html_url", ""),
+        })
+    return rows
+
+
+def write_queue_snapshot(pending_events, dispatched_owners):
+    in_progress_rows = _build_in_progress_rows()
+
+    # Simulate the fair-scheduling order on copies so we can display the
+    # estimated dispatch sequence without mutating the live state.
+    remaining = dict(pending_events)
+    owners_copy = deque(dispatched_owners)
+    waiting_rows = []
+    while remaining:
+        selected = _select_fair_event(remaining, owners_copy)
+        event_data = remaining.pop(selected)
+        owner = _get_event_owner(event_data)
+        if owner in owners_copy:
+            owners_copy.remove(owner)
+        if owner is not None:
+            owners_copy.append(owner)
+
         payload = event_data.get("payload", {})
         change = payload.get("change", {})
         patchset = payload.get("patchSet", {})
-        rows.append({
+        waiting_rows.append({
             "change_url": change.get("url", ""),
-            "change_number": change_number,
+            "change_number": selected,
             "patchset_number": patchset.get("number", ""),
             "subject": change.get("subject", ""),
+            "owner": owner or "",
+            "status": "Waiting",
+            "run_url": "",
         })
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader("./"))
     template = env.get_template("queue_status_template.html")
     html = template.render(
-        rows=rows,
+        in_progress_rows=in_progress_rows,
+        waiting_rows=waiting_rows,
         timestamp=time.strftime("%B %d %H:%M", time.gmtime()),
         interval=QUEUE_PROCESS_INTERVAL,
     )
@@ -128,12 +174,14 @@ def _get_current_revision(change):
 
 def query_gerrit_for_recovery():
     """Query Gerrit REST API for open changes without a Verified label."""
+    gerrit = GerritRestAPI(url=GERRIT_URL)
     query = "".join([
         "/changes/",
         "?q=project:spdk/spdk status:open -is:wip -is:private"
         " -label:Verified<0 -label:Verified>0"
         f" -age:{RECOVERY_WINDOW_DAYS}d",
         "&o=CURRENT_REVISION",
+        "&o=DETAILED_ACCOUNTS",
         f"&n={GERRIT_QUERY_LIMIT}",
     ])
 
@@ -179,6 +227,7 @@ def build_recovery_event(change):
         return {}
     patchset_ref = current_revision_data.get("ref")
     subject = change.get("subject")
+    owner = change.get("owner", {}).get("username")
 
     if not all([patchset_ref, subject]):
         return {}
@@ -192,6 +241,8 @@ def build_recovery_event(change):
             "change": {
                 "number": change_number,
                 "subject": subject,
+                "url": f"{GERRIT_URL}/c/spdk/spdk/+/{change_number}",
+                "owner": {"username": owner},
             },
             "patchSet": {
                 "number": patchset_number,
@@ -204,30 +255,13 @@ def build_recovery_event(change):
 
 def get_active_workflow_changes():
     """Return a set of (change_number, patchset_number) for active workflow runs."""
-    # Matches run-name pattern "(12345/5)Subject" from gerrit-webhook-handler.yml
-    display_title_re = re.compile(r"^\((\d+)/(\d+)\)")
-
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
     active = set()
-    for status in ("in_progress", "waiting", "queued"):
-        try:
-            response = requests.get(
-                GITHUB_WORKFLOW_RUNS_URL, headers=headers,
-                params={"status": status, "per_page": 100})
-            if response.status_code != 200:
-                logging.warning(f"Failed to query workflow runs (status={status}): {response.status_code}")
-                continue
-            for run in response.json().get("workflow_runs", []):
-                m = display_title_re.search(run.get("display_title", ""))
-                if m:
-                    change_number = int(m.group(1))
-                    patchset_number = int(m.group(2))
-                    active.add((change_number, patchset_number))
-        except requests.RequestException as exc:
-            logging.warning(f"Error querying workflow runs (status={status}): {exc}")
+    for run in _get_workflow_runs():
+        m = DISPLAY_TITLE_RE.search(run.get("display_title", ""))
+        if m:
+            change_number = int(m.group(1))
+            patchset_number = int(m.group(2))
+            active.add((change_number, patchset_number))
     return active
 
 
@@ -249,8 +283,42 @@ def recover_queue():
         logging.warning(f"Recovery failed (continuing startup): {exc}")
 
 
+def _get_event_owner(event_data):
+    """Return the change owner username, or None if missing."""
+    return event_data.get("payload", {}).get("change", {}).get("owner", {}).get("username")
+
+
+def _select_fair_event(pending_events, dispatched_owners):
+    """Pick the next change_number to dispatch using owner-based round-robin.
+
+    New owners (not in dispatched_owners) get priority, in insertion order.
+    When all pending owners have been dispatched before, the one dispatched
+    longest ago (front of deque) goes next.
+
+    Callers must ensure pending_events is non-empty; the function always
+    returns a valid change_number under that precondition.
+    """
+    # Pass 1: prefer events from owners we haven't dispatched yet.
+    # None owners (missing data) always pass this check and get priority.
+    for change_number, event_data in pending_events.items():
+        if _get_event_owner(event_data) not in dispatched_owners:
+            return change_number
+
+    # Pass 2: all pending owners are in the deque -- pick the one at the
+    # front (dispatched longest ago) that still has a pending event.
+    for candidate in dispatched_owners:
+        for change_number, event_data in pending_events.items():
+            if _get_event_owner(event_data) == candidate:
+                return change_number
+
+
 def process_queue():
     pending_events: dict[int, dict[str, Any]] = {}
+    # Tracks which owners have been dispatched, ordered from least-recent
+    # (front) to most-recent (back).  Used by _select_fair_event() for
+    # round-robin selection.  Cleared only when the queue fully drains so
+    # that owners returning mid-cycle land in the right position.
+    dispatched_owners: deque[str] = deque()
 
     while True:
         time.sleep(QUEUE_PROCESS_INTERVAL)
@@ -270,15 +338,25 @@ def process_queue():
             if to_send <= 0:
                 logging.info(f"Max workflows reached, deferring {len(pending_events)} events")
             else:
-                for change_number in list(pending_events):
-                    if to_send <= 0:
+                while to_send > 0 and pending_events:
+                    selected = _select_fair_event(pending_events, dispatched_owners)
+                    event_data = pending_events[selected]
+                    if not post_event_to_github(event_data["type"], event_data["payload"]):
                         break
-                    event_data = pending_events[change_number]
-                    if post_event_to_github(event_data["type"], event_data["payload"]):
-                        del pending_events[change_number]
-                        to_send -= 1
+                    del pending_events[selected]
+                    owner = _get_event_owner(event_data)
+                    if owner in dispatched_owners:
+                        dispatched_owners.remove(owner)
+                    if owner is not None:
+                        dispatched_owners.append(owner)
+                    to_send -= 1
+        else:
+            # Queue fully drained -- reset round-robin so everyone starts
+            # fresh when new events arrive.
+            dispatched_owners.clear()
 
-        write_queue_snapshot(pending_events)
+        write_queue_snapshot(pending_events, dispatched_owners)
+
 
 class WebhookHandler(BaseHTTPRequestHandler):
     def send_webhook_response(self):
@@ -312,11 +390,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_webhook_response()
             return
 
-        change_number = payload.get("change", {}).get("number")
+        change = payload.get("change", {})
+        change_number = change.get("number")
+        if not change.get("owner", {}).get("username"):
+            logging.warning(f"Event for change {change_number} is missing owner username")
         event_data = {
             "type": event_type,
             "payload": payload,
-            "change_number": change_number
+            "change_number": change_number,
         }
         event_queue.put(event_data)
 
