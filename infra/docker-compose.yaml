@@ -19,8 +19,7 @@ services:
     - ${GERRIT_DIR}/static:/var/gerrit/static
     - ${GERRIT_DIR}/tmp:/var/gerrit/tmp
     - ${GERRIT_DIR}/.ssh:/var/gerrit/.ssh
-    env_file:
-    - .env
+    env_file: ".env"
     environment:
     - CANONICAL_WEB_URL=${GERRIT_URL}
     ports:
@@ -38,6 +37,7 @@ services:
     restart: always
     env_file:
     - .env
+    - .env.forwarder
     depends_on:
     - gerrit
     volumes:
@@ -53,8 +53,7 @@ services:
       dockerfile: Dockerfile
     container_name: mergable_changes
     restart: always
-    env_file:
-    - .env
+    env_file: ".env"
     depends_on:
     - gerrit
     volumes:
