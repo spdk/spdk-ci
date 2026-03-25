@@ -1,8 +1,24 @@
 ---
 version: '3.9'
 services:
+  nginx:
+    image: nginx:1.22.1
+    container_name: nginx
+    restart: always
+    ports:
+    - "443:443"
+    depends_on:
+    - gerrit
+    volumes:
+    - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    - outputs:/var/www/outputs:ro
+    - ${NGINX_CERT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+    - ${NGINX_STATIC_DIR:-/var/www/ci.spdk.io}:/var/www/localhost:ro
+    networks:
+    - gerrit
+
   gerrit:
-    image: gerritcodereview/gerrit:3.13.3
+    image: gerritcodereview/gerrit:3.13.4
     container_name: gerrit
     restart: always
     volumes:
@@ -19,8 +35,9 @@ services:
     - ${GERRIT_DIR}/static:/var/gerrit/static
     - ${GERRIT_DIR}/tmp:/var/gerrit/tmp
     - ${GERRIT_DIR}/.ssh:/var/gerrit/.ssh
+    env_file: ".env"
     environment:
-    - CANONICAL_WEB_URL=${GERRIT_CANONICAL_WEB_URL}
+    - CANONICAL_WEB_URL=${GERRIT_URL}
     ports:
     - "29418:29418"
     - "8080:8080"
@@ -34,14 +51,14 @@ services:
       dockerfile: Dockerfile
     container_name: webhook_forwarder
     restart: always
-    environment:
-    - GITHUB_TOKEN=${GITHUB_TOKEN}
-    - GITHUB_REPO_URL=${GITHUB_REPO_URL}
-    - TEST_MODE=${FORWARDER_TEST_MODE}
+    env_file:
+    - .env
+    - .env.forwarder
     depends_on:
     - gerrit
     volumes:
-    - forwarder_logs:/var/log
+    - logs:/var/log
+    - outputs:/output
     networks:
     - gerrit
 
@@ -52,20 +69,18 @@ services:
       dockerfile: Dockerfile
     container_name: mergable_changes
     restart: always
-    environment:
-    - OUTPUT_DIR=${MERGABLE_CHANGES_OUTPUT_DIR}
+    env_file: ".env"
     depends_on:
     - gerrit
     volumes:
-    - mergable_changes_logs:/var/log
-    - mergable_changes_out:/output
+    - logs:/var/log
+    - outputs:/output
     networks:
     - gerrit
 
 volumes:
-  forwarder_logs:
-  mergable_changes_logs:
-  mergable_changes_out:
+  logs:
+  outputs:
 
 networks:
   gerrit:
