@@ -13,6 +13,10 @@ on:
         type: string
         default: 'failure'
 
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+
 jobs:
   merge_outputs:
     # 22.04 used on purpose; it has lcov+gcov versions that are compatible with what
@@ -60,6 +64,7 @@ jobs:
         # Now can run post processing
         ./scripts/autorun_post.py -d ../_autorun_summary -r ./
         echo "result=success" >> "$GITHUB_OUTPUT"
+        echo "spdk_sha=$(git -C ./spdk rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
     - name: Upload artifacts
       if: ${{ always() }}
@@ -67,6 +72,17 @@ jobs:
       with:
         name: _autorun_summary
         path: _autorun_summary
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5.5.2
+      with:
+        fail_ci_if_error: true
+        use_oidc: true
+        disable_search: true
+        files: ./_autorun_summary/ut_coverage/ut_cov_total.info
+        override_commit: ${{ steps.autorun_post.outputs.spdk_sha }}
+        slug: spdk/spdk
+
     outputs:
       result: ${{ steps.autorun_post.outputs.result }}
 
