@@ -104,6 +104,7 @@ jobs:
     needs:
     - checkout_spdk
     strategy:
+      max-parallel: 5
       matrix:
         # Keep latest 2 versions of each flavor here
         container:
@@ -173,6 +174,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
+      max-parallel: 5
       matrix:
         workflow:
         - {name: nvme-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
