@@ -53,15 +53,14 @@ or manage artifacts of the SPDK CI repository, shall be placed in `.github/actio
 
 ## Locally testing actions
 
-install see <https://nektosact.com/installation>
-
-or use [GitHub CLI](https://cli.github.com/)
+### Installation
+See: <https://nektosact.com/installation> or use [GitHub CLI](https://cli.github.com/) to install the extension.
 
 ```bash
 gh extension install https://github.com/nektos/gh-act
 ```
 
-list all actions
+### Listing jobs and workflows
 
 ```bash
 $ gh act --list
@@ -78,13 +77,14 @@ Stage  Job ID          Job name        Workflow name                Workflow fil
 2      report          report          SPDK per-patch common tests  spdk-common-tests.yml       workflow_dispatch,workflow_call
 ```
 
-run all common tests
+### Running jobs and workflows
 
+Running common tests with a workflow_dispatch event:
 ```bash
  $ gh act --job tests --secret GITHUB_TOKEN=$(gh auth token) workflow_dispatch
 ```
 
-run a workflow using repository_dispatch event (example events provided in `.github/example_events`)
+Running a workflow using repository_dispatch event (example events provided in `.github/example_events`):
 
 ```bash
  $ gh act --job parse_comment --secret GITHUB_TOKEN=$(gh auth token) -e .github/example_events/comment-added.json repository_dispatch
