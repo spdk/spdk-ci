@@ -60,6 +60,31 @@ See: <https://nektosact.com/installation> or use [GitHub CLI](https://cli.github
 gh extension install https://github.com/nektos/gh-act
 ```
 
+### Before running locally
+
+Workflows containing jobs executing SPDK tests (like `spdk-common-tests.yml`) require a qcow2 image to be available.
+`spdk-common-tests.yml` will attempt to download the qcow2 image from local `gh act` cache or from GitHub Actions artifacts,
+and will do so for every workflow execution.
+
+It is advised to have a local copy of Qcow2 artifacts to reduce the need to download them from Github Actions every time.
+
+In order to do so:
+
+* If using a forked `spdk-ci` repository:
+    * Build the images using `SPDK-CI build VM image` in your forked repository. This workflow witll archive and cache the
+    images on Github side.
+    * Optionally follow up with `SPDK-CI build Docker image` as well, so that Qcow2 images are converted into Docker images
+    and uploaded to ghcr.io associated with your forked repository.
+    * Locally, using `gh act` run `Reupload qcow2 vm images` workflow.
+    This will download a copy of the images from your forked repository's Github Actions and cache them locally.
+
+    ```bash
+    $ gh act --artifact-server-path=$HOME/.cache/act -W .github/workflows/reupload_qcow2.yml -v workflow_dispatch
+    ```
+    `--cache-server-path` has a default value, so does not have to be provided in the command.
+* If using a clone of `spdk/spdk-ci` repository:
+    * Run `Reupload qcow2 vm images` workflow as in the exemple in previous point.
+
 ### Listing jobs and workflows
 
 ```bash
