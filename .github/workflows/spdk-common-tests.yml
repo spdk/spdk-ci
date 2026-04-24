@@ -233,12 +233,11 @@ jobs:
     # ghcr.io/spdk/spdk-ci:fedora_43 is about ~10GB in size, leaving us with not much space
     # for tests after pulling the image. Reclaim some by removing features not used in SPDK tests
     # See: https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
-    # Run this ONLY on self-hosted runners and make sure it's not a local GH ACT runner (these
+    # Run this ONLY on github-hosted runners and make sure it's not a local GH ACT runner (these
     # identify themselves as "github-hosted" runners!)
     - name: Cleanup runner
-      if: ${{ contains(runner.environment, 'github-hosted') }}
+      if: ${{ contains(runner.environment, 'github-hosted') && ! contains(github.actor, 'nektos/act') }}
       run: |
-        [[ $GITHUB_ACTOR == "nektos/act" || ACT == "true" ]] && exit 0
         rm -rf /host-usr-share/dotnet \
           /host-usr-local/lib/android \
           /host-usr-local/share/edge_driver \
