@@ -6,9 +6,10 @@ import time
 import jinja2
 import logging
 import datetime
+import sys
 from typing import Dict
 from prettytable import PrettyTable
-from requests import RequestException
+from requests import RequestException, ConnectionError
 from pygerrit2 import GerritRestAPI
 
 @dataclass
@@ -134,7 +135,12 @@ def get_gerrit_changes(gerrit, all_changes):
         "/changes/", "?q=project:spdk/spdk status:open label:Code-Review=2 label:Verified=1",
         "&o=CURRENT_REVISION", "&o=DETAILED_LABELS", "&o=DETAILED_ACCOUNTS", "&o=SUBMITTABLE"
     ])
-    changes_json = gerrit.get(query)
+    try:
+        changes_json = gerrit.get(query)
+    except ConnectionError as conn_exception:
+        logging.exception(conn_exception)
+        sys.exit(1)
+
     for change_json in changes_json:
         change = GerritChange.from_json(change_json)
         all_changes.append(change)
