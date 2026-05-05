@@ -8,7 +8,8 @@ services:
     ports:
     - "443:443"
     depends_on:
-    - gerrit
+      gerrit:
+        condition: service_healthy
     volumes:
     - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     - outputs:/var/www/outputs:ro
@@ -21,6 +22,13 @@ services:
     image: gerritcodereview/gerrit:3.13.5
     container_name: gerrit
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "-X", "GET", "${GERRIT_URL}/config/server/version"]
+      start_period: 60s
+      start_interval: 3s
+      timeout: 5s
+      interval: 15s
+      retries: 5
     volumes:
     - ${GERRIT_DIR}/cache:/var/gerrit/cache
     - ${GERRIT_DIR}/data:/var/gerrit/data
@@ -55,8 +63,10 @@ services:
     - .env
     - .env.forwarder
     depends_on:
-    - gerrit
-    - nginx
+      gerrit:
+        condition: service_healthy
+      nginx:
+        condition: service_started
     volumes:
     - logs:/var/log
     - outputs:/output
@@ -72,8 +82,10 @@ services:
     restart: always
     env_file: ".env"
     depends_on:
-    - gerrit
-    - nginx
+      gerrit:
+        condition: service_healthy
+      nginx:
+        condition: service_started
     volumes:
     - logs:/var/log
     - outputs:/output
