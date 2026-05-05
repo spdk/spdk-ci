@@ -118,7 +118,6 @@ jobs:
         - docker.io/library/fedora:43
         - docker.io/library/debian:12.12
         - docker.io/library/debian:11.11
-        - docker.io/opensuse/leap:15.6
         - docker.io/opensuse/leap:16.0
         - mcr.microsoft.com/azurelinux/base/core:3.0
         # - docker.io/library/archlinux:base-20250907.0.417472
@@ -136,8 +135,6 @@ jobs:
         name: repo-spdk
     - if: contains(matrix.container, 'ubuntu') || contains(matrix.container, 'debian') || contains(matrix.os, 'ubuntu-22.04-arm')
       run: ${{ matrix.container == '' && 'sudo' || '' }} apt-get update
-    - if: matrix.container == 'docker.io/opensuse/leap:15.6'
-      run: zypper install -y tar gzip
     - if: matrix.container == 'mcr.microsoft.com/azurelinux/base/core:3.0'
       run: tdnf --noplugins install -y tar
     - shell: bash
