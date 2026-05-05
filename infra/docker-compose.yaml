@@ -2,9 +2,12 @@
 version: '3.9'
 services:
   nginx:
-    image: nginx:1.29.8
     container_name: nginx
     restart: always
+    image: nginx-gerrit:latest
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     ports:
     - "443:443"
     depends_on:
