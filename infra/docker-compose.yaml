@@ -1,12 +1,50 @@
 ---
-version: '3.9'
 services:
+  nginx:
+    image: nginx:1.29.8
+    container_name: nginx
+    restart: always
+    ports:
+    - "443:443"
+    depends_on:
+      gerrit:
+        condition: service_healthy
+    volumes:
+    - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    - outputs:/var/www/outputs:ro
+    - ${NGINX_CERT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+    - ${NGINX_STATIC_DIR:-/var/www/ci.spdk.io}:/var/www/localhost:ro
+    networks:
+    - gerrit
+
   gerrit:
-    image: gerritcodereview/gerrit:3.10.0
+    image: gerritcodereview/gerrit:3.13.5
     container_name: gerrit
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "-X", "GET", "${GERRIT_URL}/config/server/version"]
+      start_period: 60s
+      start_interval: 3s
+      timeout: 5s
+      interval: 15s
+      retries: 5
+    volumes:
+    - ${GERRIT_DIR}/cache:/var/gerrit/cache
+    - ${GERRIT_DIR}/data:/var/gerrit/data
+    - ${GERRIT_DIR}/db:/var/gerrit/db
+    - ${GERRIT_DIR}/etc:/var/gerrit/etc
+    - ${GERRIT_DIR}/events-db:/var/gerrit/events-db
+    - ${GERRIT_DIR}/git:/var/gerrit/git
+    - ${GERRIT_DIR}/index:/var/gerrit/index
+    - ${GERRIT_DIR}/lib:/var/gerrit/lib
+    - ${GERRIT_DIR}/logs:/var/gerrit/logs
+    - ${GERRIT_DIR}/plugins:/var/gerrit/plugins
+    - ${GERRIT_DIR}/static:/var/gerrit/static
+    - ${GERRIT_DIR}/tmp:/var/gerrit/tmp
+    - ${GERRIT_DIR}/.ssh:/var/gerrit/.ssh
+    env_file: ".env"
     environment:
-    - CANONICAL_WEB_URL=http://127.0.0.1:8080
+    - CANONICAL_WEB_URL=${GERRIT_URL}
     ports:
     - "29418:29418"
     - "8080:8080"
@@ -18,16 +56,19 @@ services:
     build:
       context: ./forwarder
       dockerfile: Dockerfile
-    container_name: webhook_forwarder
+    container_name: forwarder
     restart: always
-    environment:
-    - GITHUB_TOKEN=${GITHUB_TOKEN}
-    - GITHUB_ACTION_URL=${GITHUB_ACTION_URL}
-    - TEST_MODE=${TEST_MODE}
+    env_file:
+    - .env
+    - .env.forwarder
     depends_on:
-    - gerrit
+      gerrit:
+        condition: service_healthy
+      nginx:
+        condition: service_started
     volumes:
-    - forwarder_logs:/var/log
+    - logs:/var/log
+    - outputs:/output
     networks:
     - gerrit
 
@@ -38,21 +79,21 @@ services:
       dockerfile: Dockerfile
     container_name: mergable_changes
     restart: always
-    environment:
-    - OUTPUT_DIR=${OUTPUT_DIR}
+    env_file: ".env"
     depends_on:
-    - gerrit
+      gerrit:
+        condition: service_healthy
+      nginx:
+        condition: service_started
     volumes:
-    - mergable_changes_logs:/var/log
-    - mergable_changes_out:/output
+    - logs:/var/log
+    - outputs:/output
     networks:
     - gerrit
 
 volumes:
-  gerrit_data:
-  forwarder_logs:
-  mergable_changes_logs:
-  mergable_changes_out:
+  logs:
+  outputs:
 
 networks:
   gerrit:

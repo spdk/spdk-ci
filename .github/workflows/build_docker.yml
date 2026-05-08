@@ -37,7 +37,8 @@ on:
       push_to_registry:
         description: 'Push to registry -- ghcr.io'
         required: false
-        default: 'false'
+        type: boolean
+        default: false
       distro:
         description: 'Distribution name_ver to build docker from qcow2 image'
         required: false
@@ -102,19 +103,19 @@ jobs:
           /host-usr-local/kotlin
 
     - name: Checkout CI repository
-      uses: actions/checkout@v4.1.7
+      uses: actions/checkout@v6
       with:
         path: ci
 
     - name: Restore qcow2 image from cache
       id: restore-qcow2
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ inputs.distro }}_x86_64.qcow2
         key: vm-image-${{ inputs.distro }}_x86_64
 
     - name: Download VM Qcow2 image artifact
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v8.0.1
       if: hashFiles(format('{0}_x86_64.qcow2', inputs.distro)) == ''
       with:
         name: vm-image-${{ inputs.distro }}_x86_64
@@ -130,7 +131,7 @@ jobs:
         --workflow workflows/build_docker_using_qcow2.yaml
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       if: always()
       with:
         path: ci/cijoe/cijoe-output

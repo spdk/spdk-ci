@@ -33,6 +33,11 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.client_payload != '' && fromJson(inputs.client_payload).change.number
+    || inputs.gerrit_ref }}
+  cancel-in-progress: true
+
 env:
   spdk_path: './spdk'
 jobs:
@@ -43,7 +48,7 @@ jobs:
     steps:
       # Required to use locally defined actions
     - name: Checkout the spdk-ci repo locally
-      uses: actions/checkout@v4.1.7
+      uses: actions/checkout@v6
 
     - name: Prepare SPDK repo by checking out from Gerrit
       uses: ./.github/actions/checkout_gerrit
@@ -55,13 +60,13 @@ jobs:
       run: tar -C ${{ env.spdk_path }} -czf spdk.tar.gz .
 
     - name: Upload the repository tarball as an artifact
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       with:
         name: repo-spdk
         path: spdk.tar.gz
 
     - name: Checkout the spdk-abi repo
-      uses: actions/checkout@v4.1.7
+      uses: actions/checkout@v6
       with:
         repository: 'spdk/spdk-abi'
         path: './spdk-abi'
@@ -71,7 +76,7 @@ jobs:
     - name: Create abi tarball
       run: tar -C './spdk-abi' -czf spdk-abi.tar.gz .
     - name: Upload the abi tarball as an artifact
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       with:
         name: repo-spdk-abi
         path: spdk-abi.tar.gz
@@ -116,8 +121,7 @@ jobs:
         - docker.io/library/fedora:43
         - docker.io/library/debian:12.12
         - docker.io/library/debian:11.11
-        - docker.io/opensuse/leap:15.6
-        # - docker.io/opensuse/leap:16.0
+        - docker.io/opensuse/leap:16.0
         - mcr.microsoft.com/azurelinux/base/core:3.0
         # - docker.io/library/archlinux:base-20250907.0.417472
         include:
@@ -129,13 +133,11 @@ jobs:
       DISTRO: ${{ matrix.container }}
     container: ${{ matrix.container != '' && matrix.container || null }}
     steps:
-    - uses: actions/download-artifact@v4.1.8
+    - uses: actions/download-artifact@v8.0.1
       with:
         name: repo-spdk
     - if: contains(matrix.container, 'ubuntu') || contains(matrix.container, 'debian') || contains(matrix.os, 'ubuntu-22.04-arm')
       run: ${{ matrix.container == '' && 'sudo' || '' }} apt-get update
-    - if: matrix.container == 'docker.io/opensuse/leap:15.6'
-      run: zypper install -y tar gzip
     - if: matrix.container == 'mcr.microsoft.com/azurelinux/base/core:3.0'
       run: tdnf --noplugins install -y tar
     - shell: bash
@@ -192,6 +194,7 @@ jobs:
         - {name: build-files-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: scan-build-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: check-so-deps-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: packaging-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         include:
         - distro: "fedora_43"
         - nvme_setup: "zns"
@@ -208,6 +211,7 @@ jobs:
       CI_CFGS_REPOSITORY_PATH: ${{ github.workspace }}/ci/cijoe/configs/autorun_configs
       NVME_SETUP: ${{ matrix.nvme_setup }}
       DISTRO: ${{ matrix.distro }}
+      GITHUB_WORKSPACE: ${{ github.workspace }}
 
     # TODO: Figure out how to pass volumes variable to container context
     container:
@@ -248,17 +252,17 @@ jobs:
         echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     - name: Checkout CI repository
-      uses: actions/checkout@v4.1.7
+      uses: actions/checkout@v6
       with:
         path: ci
 
     - name: Download the SPDK repository
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v8.0.1
       with:
         name: repo-spdk
 
     - name: Download the SPDK ABI repository
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v8.0.1
       with:
         name: repo-spdk-abi
 
@@ -270,13 +274,13 @@ jobs:
     - name: Restore qcow2 image from cache
       if: contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')
       id: restore-qcow2
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{matrix.distro}}_x86_64.qcow2
         key: vm-image-${{matrix.distro}}_x86_64
 
     - name: Download VM Qcow2 image artifact
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v8.0.1
       if: (contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')) && hashFiles(format('{0}_x86_64.qcow2',
         matrix.distro)) == ''
       with:
@@ -328,14 +332,14 @@ jobs:
         --monitor
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       if: always()
       with:
         path: /tmp/autorun_output
         name: common-job-${{ matrix.workflow.name }}
 
     - name: Upload Report
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       if: always()
       with:
         path: |

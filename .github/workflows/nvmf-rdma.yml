@@ -26,7 +26,7 @@ jobs:
     steps:
       # Required to use locally defined actions
     - name: Checkout the spdk-ci repo locally
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Checkout SPDK repo from Gerrit
       uses: ./.github/actions/checkout_gerrit
       with:
@@ -42,10 +42,11 @@ jobs:
         NET_TYPE=phy
         SPDK_RUN_ASAN=0
         SPDK_RUN_UBSAN=1
+        AUTOTEST_COLORS_ENABLED=no
         EOF
         ./spdk/autorun.sh ./funtest.conf
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       if: always()
       with:
         path: ./output

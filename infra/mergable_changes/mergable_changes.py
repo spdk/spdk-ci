@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
 
 import os
+from dataclasses import dataclass, field
 import time
 import jinja2
 import logging
 import datetime
+import sys
 from typing import Dict
 from prettytable import PrettyTable
-from requests import RequestException
-from dataclasses import dataclass, field
+from requests import RequestException, ConnectionError
 from pygerrit2 import GerritRestAPI
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/output")
-GERRIT_BASE_URL = os.getenv("GERRIT_BASE_URL", "https://review.spdk.io")
-GERRIT_CHANGE_URL = os.path.join(GERRIT_BASE_URL, "c")
+@dataclass
+class MergableChangesConfig:
+    log_level: str = "INFO"
+    output_dir: str = "/output"
+    gerrit_url: str = "https://review.spdk.io"
+    gerrit_change_url: str = field(init=False)
 
+    def __post_init__(self):
+        self.log_level = os.getenv("LOG_LEVEL", self.log_level).upper()
+        self.output_dir = os.getenv("OUTPUT_DIR", self.output_dir)
+        self.gerrit_url = os.getenv("GERRIT_URL", self.gerrit_url).rstrip("/")
+        self.gerrit_change_url = f"{self.gerrit_url}/c"
+
+config = MergableChangesConfig()
 
 @dataclass
 class GerritChange:
@@ -40,7 +50,7 @@ class GerritChange:
         created = created.replace(tzinfo=datetime.timezone.utc)
         self.age = datetime.datetime.now(datetime.timezone.utc) - created
         self.hours = self.age.seconds // 3600
-        self.url = os.path.join(GERRIT_CHANGE_URL, self.project, '+', str(self.number))
+        self.url = os.path.join(config.gerrit_change_url, self.project, '+', str(self.number))
 
     @classmethod
     def from_json(cls, change_json: Dict):
@@ -125,7 +135,12 @@ def get_gerrit_changes(gerrit, all_changes):
         "/changes/", "?q=project:spdk/spdk status:open label:Code-Review=2 label:Verified=1",
         "&o=CURRENT_REVISION", "&o=DETAILED_LABELS", "&o=DETAILED_ACCOUNTS", "&o=SUBMITTABLE"
     ])
-    changes_json = gerrit.get(query)
+    try:
+        changes_json = gerrit.get(query)
+    except ConnectionError as conn_exception:
+        logging.exception(conn_exception)
+        sys.exit(1)
+
     for change_json in changes_json:
         change = GerritChange.from_json(change_json)
         all_changes.append(change)
@@ -164,7 +179,7 @@ def write_text_summary(all_changes):
     }
 
     timestamp = datetime.datetime.now(datetime.timezone.utc)
-    with open(os.path.join(OUTPUT_DIR, "mergable_changes.txt"), "w") as fh:
+    with open(os.path.join(config.output_dir, "mergable_changes.txt"), "w") as fh:
         fh.write(f"Generated at {timestamp}\n")
         fh.write("Contents are re-generated every 5 minutes.\n\n\n")
         for section_name, changes in sections.items():
@@ -189,13 +204,13 @@ def write_text_summary(all_changes):
                 write_and_log("No changes in this category.\n", fh)
 
     template = jinja2.Environment(loader=jinja2.FileSystemLoader('./')).get_template("template.html")
-    with open(os.path.join(OUTPUT_DIR, "mergable_changes.html"), "w+") as output:
+    with open(os.path.join(config.output_dir, "mergable_changes.html"), "w+") as output:
         output.write(template.render(sections=sections, timestamp=timestamp.strftime("%B %d %H:%M")))
 
 
 def main():
     logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL, logging.INFO),
+        level=getattr(logging, config.log_level, logging.INFO),
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(),
@@ -205,7 +220,7 @@ def main():
 
     while True:
         all_changes = []
-        gerrit = GerritRestAPI(url=GERRIT_BASE_URL)
+        gerrit = GerritRestAPI(url=config.gerrit_url)
         get_gerrit_changes(gerrit, all_changes)
         for change in all_changes:
             change.check_parents_ready(gerrit, all_changes)

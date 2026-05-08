@@ -18,16 +18,18 @@ jobs:
     # 22.04 used on purpose; it has lcov+gcov versions that are compatible with what
     # is used in cijoe's Fedora 40 images. Using lcov+gcov from ubuntu-latest results
     # in warnings and/or failures.
-    runs-on: ubuntu-22.04
+    # ARM is used on purpose; it has separate queue, so those jobs can start immeditely
+    # and the billing is exactly the same as x86 ubuntu runner (unlike macos or windows) so penalty is zero
+    runs-on: ubuntu-22.04-arm
     steps:
     - name: Download the SPDK repository
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v8.0.1
       with:
         name: repo-spdk
         path: ./spdk
 
     - name: Download artifact tarballs
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v8.0.1
       with:
         pattern: '*-job-*'
         path: ./_autorun_summary
@@ -45,18 +47,23 @@ jobs:
 
     - name: Post process artifacts from jobs
       id: autorun_post
+      working-directory: spdk
       run: |
         # TODO: either use an official lcov image or create our own
         # TODO: get rid of pandas dependency in spdk/autorun_post.py.
         #       It's ~1GB with all it's dependecies, which is an overkill for
         #       a few table operations.
-        sudo apt-get update && sudo apt-get install -y lcov python3-pandas
-        ./spdk/autorun_post.py -d ./_autorun_summary -r ./spdk
+        sudo apt-get update && sudo apt-get install -y lcov python3-pandas python3-tabulate
+        # This step is needed for auto code generation of the header file `include/spdk_internal/rpc_autogen.h`
+        ./configure --without-nvme-cuse
+        make -C include jsonrpc
+        # Now can run post processing
+        ./scripts/autorun_post.py -d ../_autorun_summary -r ./
         echo "result=success" >> "$GITHUB_OUTPUT"
 
     - name: Upload artifacts
       if: ${{ always() }}
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v7.0.0
       with:
         name: _autorun_summary
         path: _autorun_summary
@@ -65,7 +72,9 @@ jobs:
 
   report:
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    # ubuntu-22.04-arm is used on purpose; it has separate queue, so those jobs can start immeditely
+    # and the billing is exactly the same as x86 ubuntu runner (unlike macos or windows) so penalty is zero
+    runs-on: ubuntu-22.04-arm
     needs: merge_outputs
     steps:
     - name: Vote count from workflows

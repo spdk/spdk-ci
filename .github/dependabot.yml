@@ -1,0 +1,20 @@
+---
+version: 2
+updates:
+- package-ecosystem: "github-actions"
+  directories:
+  - "/"
+  - ".github/actions/**"
+  schedule:
+    interval: "weekly"
+
+- package-ecosystem: "docker"
+  directories:
+  - "/infra/**"
+  schedule:
+    interval: "weekly"
+
+- package-ecosystem: "docker-compose"
+  directory: "/infra"
+  schedule:
+    interval: "weekly"

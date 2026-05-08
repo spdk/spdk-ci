@@ -134,6 +134,10 @@ steps:
   run: |
     rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/check-so-deps-container-autotest.conf && ocf_precompile && SPDK_ABI_DIR=/opt/spdk-abi check_so_deps
 
+- name: packaging-container-autotest
+  run: |
+    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/packaging-container-autotest.conf && build_packaging
+
 - name: short-fuzz-vm-autotest
   run: |
     /opt/spdk/autorun.sh /opt/configs/short-fuzz-vm-autotest.conf
@@ -144,7 +148,7 @@ steps:
 - name: vfio-user-container-autotest
   run: |
     echo "export VM_IMAGE={{ local.env.GITHUB_WORKSPACE }}/fedora_43_x86_64.qcow2" >> /opt/configs/vfio-user-container-autotest.conf
-    sudo() { "${@:2}" ; } &&  export -f sudo && /opt/spdk/autorun.sh /opt/configs/vfio-user-container-autotest.conf
+    sudo() { "${@:2}" ; } &&  export -f sudo && source /opt/configs/vfio-user-container-autotest.conf && export HUGEMEM=${HUGEMEM} && sudo -E /opt/spdk/scripts/setup.sh && /opt/spdk/autorun.sh /opt/configs/vfio-user-container-autotest.conf
 
 - name: output_listing
   run: |
