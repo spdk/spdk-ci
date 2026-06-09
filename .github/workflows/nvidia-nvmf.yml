@@ -1,0 +1,75 @@
+---
+name: Nvidia NVMe-oF tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      gerrit_ref:
+        description: 'Gerrit refspec to test following refs/changes/${change_number: -2}/${change_number}/${patch_set} format'
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      client_payload:
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  nvidia-nvmf:
+    name: nvidia-nvmf-${{ matrix.name }}
+    runs-on: [linux, x64, ubuntu-2404, nvidia-vm]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: rdma
+          funtest_conf: |
+            SPDK_RUN_FUNCTIONAL_TEST=1
+            SPDK_TEST_NVMF=1
+            SPDK_TEST_NVMF_TRANSPORT="rdma"
+            SPDK_TEST_NVMF_NICS=mlx5
+            NET_TYPE=phy
+            SPDK_RUN_ASAN=0
+            SPDK_RUN_UBSAN=1
+            AUTOTEST_COLORS_ENABLED=no
+        - name: tcp
+          funtest_conf: |
+            SPDK_RUN_FUNCTIONAL_TEST=1
+            SPDK_TEST_NVMF=1
+            SPDK_TEST_NVME_CLI=1
+            SPDK_TEST_NVMF_TRANSPORT=tcp
+            SPDK_TEST_URING=0
+            SPDK_TEST_VFIOUSER=1
+            SPDK_TEST_USDT=1
+            SPDK_TEST_NVMF_MDNS=1
+            SPDK_RUN_UBSAN=1
+            SPDK_RUN_ASAN=1
+            NET_TYPE=virt
+            AUTOTEST_COLORS_ENABLED=no
+    env:
+      gerrit_ref: ${{ inputs.client_payload != '' && fromJson(inputs.client_payload).patchSet.ref || inputs.gerrit_ref }}
+      spdk_path: './spdk'
+    steps:
+      # Required to use locally defined actions
+    - name: Checkout the spdk-ci repo locally
+      uses: actions/checkout@v6
+    - name: Checkout SPDK repo from Gerrit
+      uses: ./.github/actions/checkout_gerrit
+      with:
+        gerrit_ref: ${{ env.gerrit_ref }}
+        spdk_path: ${{ env.spdk_path }}
+    - name: autorun-nvmf
+      run: |
+        cat > funtest.conf << EOF
+        ${{ matrix.funtest_conf }}
+        EOF
+        ./spdk/autorun.sh ./funtest.conf
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v7.0.0
+      if: always()
+      with:
+        path: ./output
+        name: nvidia-job-nvmf-${{ matrix.name }}
