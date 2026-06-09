@@ -83,6 +83,15 @@ jobs:
     uses: ./.github/workflows/nvmf-rdma.yml
     with:
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
+
+  nvidia:
+    name: Nvidia NVMe-oF tests
+    if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' }}
+    needs:
+    - patch_set_status
+    uses: ./.github/workflows/nvidia-nvmf.yml
+    with:
+      client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
   # Add more jobs below if needed.
 
 
@@ -94,10 +103,17 @@ jobs:
     - patch_set_status
     - common
     - hpe
+    - nvidia
     uses: ./.github/workflows/summary.yml
     with:
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
       result: >-
-        ${{ (needs.common.result == 'success' && (needs.hpe.result == 'success' || needs.hpe.result == 'skipped')) &&
-        'success' || 'failure' }}
+        ${{
+          (
+            needs.common.result == 'success' &&
+            (needs.hpe.result == 'success' || needs.hpe.result == 'skipped') &&
+            (needs.nvidia.result == 'success' || needs.nvidia.result == 'skipped')
+          ) &&
+          'success' || 'failure'
+        }}
     secrets: inherit
