@@ -1,5 +1,5 @@
 ---
-name: nvmf-rdma-test
+name: HPE NVMe-oF tests
 
 on:
   workflow_dispatch:
