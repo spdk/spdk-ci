@@ -76,11 +76,11 @@ jobs:
       force_pkgdep: ${{ github.event_name == 'pull_request' }}
 
   hpe:
-    name: NVMe-oF RDMA tests
+    name: HPE NVMe-oF tests
     if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' }}
     needs:
     - patch_set_status
-    uses: ./.github/workflows/nvmf-rdma.yml
+    uses: ./.github/workflows/hpe-nvmf.yml
     with:
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
 
