@@ -103,7 +103,7 @@ jobs:
           /host-usr-local/kotlin
 
     - name: Checkout CI repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         path: ci
 
