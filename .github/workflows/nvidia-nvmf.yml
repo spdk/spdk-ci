@@ -30,6 +30,7 @@ jobs:
             SPDK_RUN_FUNCTIONAL_TEST=1
             SPDK_TEST_NVMF=1
             SPDK_TEST_NVMF_TRANSPORT="rdma"
+            SPDK_TEST_RDMA_PROV=mlx5_dv
             SPDK_TEST_NVMF_NICS=mlx5
             NET_TYPE=phy
             SPDK_RUN_ASAN=0
