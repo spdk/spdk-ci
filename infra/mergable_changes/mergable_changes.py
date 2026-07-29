@@ -132,7 +132,9 @@ class GerritChange:
 
 def get_gerrit_changes(gerrit, all_changes):
     query = "".join([
-        "/changes/", "?q=project:spdk/spdk status:open label:Code-Review=2 label:Verified=1",
+        "/changes/",
+        "?q=(project:spdk/spdk status:open label:Code-Review=2 label:Verified=1)",
+        " OR (-project:spdk/spdk status:open label:Code-Review=2)",
         "&o=CURRENT_REVISION", "&o=DETAILED_LABELS", "&o=DETAILED_ACCOUNTS", "&o=SUBMITTABLE"
     ])
     try:
@@ -193,13 +195,13 @@ def write_text_summary(all_changes):
             if changes:
                 table = PrettyTable()
                 table.align = "l"
-                field_names = ["Number", "Subject", "Owner", "URL", "Age"]
+                field_names = ["Number", "Project", "Subject", "Owner", "URL", "Age"]
                 field_names.append("Reviewed by") if "another +2 CR" in section_name else None
                 field_names.append("Blocked by") if "blocked" in section_name else None
                     
                 table.field_names = field_names
                 for change in changes:
-                    row_values = [change.number, change.subject, change.owner, change.url, f"{change.age.days:} days {change.hours} hours"]
+                    row_values = [change.number, change.project, change.subject, change.owner, change.url, f"{change.age.days:} days {change.hours} hours"]
                     row_values.append(change.reviewed_by) if "another +2 CR" in section_name else None
                     row_values.append(change.blocked_by.url) if "blocked" in section_name else None
                     table.add_row(row_values)

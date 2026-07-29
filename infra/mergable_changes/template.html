@@ -30,6 +30,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -39,6 +40,7 @@
                     {% for change in sections["Changes ready for merge"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -67,6 +69,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -77,6 +80,7 @@
                     {% for change in sections["Stale changes needing another +2 CR vote"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -106,6 +110,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -116,6 +121,7 @@
                     {% for change in sections["Changes needing another +2 CR vote"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -145,6 +151,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -154,6 +161,7 @@
                     {% for change in sections["Changes with a -1 CR vote"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -182,6 +190,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -191,6 +200,7 @@
                     {% for change in sections["Changes with a merge conflict"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -219,6 +229,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -229,6 +240,7 @@
                     {% for change in sections["Changes blocked by parents in series"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
