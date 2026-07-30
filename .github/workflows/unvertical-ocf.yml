@@ -1,0 +1,125 @@
+---
+name: Unvertical OCF tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      gerrit_ref:
+        description: 'Gerrit refspec to test following refs/changes/${change_number: -2}/${change_number}/${patch_set} format'
+        required: false
+        type: string
+        default: ''
+      full_suite:
+        description: 'Run the full OCF suite (ocf_full.sh) instead of the CI one (ocf_ci.sh).'
+        required: false
+        type: boolean
+        default: false
+      timeout_minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        type: number
+        default: 30
+  workflow_call:
+    inputs:
+      client_payload:
+        required: false
+        type: string
+        default: ''
+      full_suite:
+        required: false
+        type: boolean
+        default: false
+      timeout_minutes:
+        required: false
+        type: number
+        default: 30
+
+jobs:
+  unvertical-ocf:
+    name: OCF ${{ inputs.full_suite && 'full' || 'CI' }} suite
+    runs-on: [self-hosted, unvertical-ocf-vm]
+    timeout-minutes: ${{ fromJSON(inputs.timeout_minutes) }}
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/spdk/spdk-ci:fedora_43
+      options: --privileged
+      volumes:
+      - "/dev/hugepages:/dev/hugepages"
+    env:
+      gerrit_ref: ${{ inputs.client_payload != '' && fromJson(inputs.client_payload).patchSet.ref || inputs.gerrit_ref }}
+      spdk_path: './spdk'
+      ocf_full: ${{ inputs.full_suite && 1 || 0 }}
+      # For scripts/setup.sh, which autotest.sh runs after the build: keep the
+      # VM's devices bound to their drivers (the tests use aio bdevs only) and
+      # leave releasing hugepages to the release steps.
+      HUGEMEM: 4096
+      CLEAR_HUGE: 'no'
+      DRIVER_OVERRIDE: none
+    steps:
+      # Required to use locally defined actions
+    - name: Checkout the spdk-ci repo locally
+      uses: actions/checkout@v7
+    - name: Checkout SPDK repo from Gerrit
+      uses: ./.github/actions/checkout_gerrit
+      with:
+        gerrit_ref: ${{ env.gerrit_ref }}
+        spdk_path: ${{ env.spdk_path }}
+
+    - name: Check the patch set carries the OCF tests
+      working-directory: ${{ env.spdk_path }}
+      run: |
+        if ! grep -q '^persistent_dev_id=("$OCF_AIO_DIR' test/ocf/common.sh 2> /dev/null; then
+          echo "FATAL: test/ocf/common.sh does not back persistent devices with aio bdevs." >&2
+          echo "This workflow needs the OCF v2 series; point gerrit_ref at it." >&2
+          exit 1
+        fi
+        if ((ocf_full)) && ! grep -q SPDK_TEST_OCF_FULL test/common/autotest_common.sh; then
+          echo "::warning::This patch set has no SPDK_TEST_OCF_FULL; running the CI suite instead."
+        fi
+
+    - name: Release hugepages left by an earlier run
+      # Hugepages outlive the container, so a previous run's leftovers are this
+      # run's problem. (The aio images do not - they live in the workspace, which
+      # actions/checkout cleans.)
+      run: |
+        # Files in the hugetlbfs mount pin pages and would make the shrink below
+        # quietly under-deliver. This is what scripts/setup.sh's reset does.
+        rm -f /dev/hugepages/spdk*map_* 2> /dev/null || true
+        echo 0 > /proc/sys/vm/nr_hugepages
+        awk '/^HugePages_Total:/ { print "HugePages_Total after release: " $2 }' /proc/meminfo
+
+    - name: autorun
+      # Hugepages are allocated by autotest.sh after autobuild.sh is done, which
+      # the small 8G VM needs: with them taken up front, the -j 4 build OOMs.
+      working-directory: ${{ env.spdk_path }}
+      run: |
+        cat > ../ocf.conf << EOF
+        SPDK_RUN_FUNCTIONAL_TEST=1
+        SPDK_TEST_OCF=1
+        SPDK_TEST_OCF_FULL=$ocf_full
+        SPDK_RUN_ASAN=0
+        SPDK_RUN_UBSAN=1
+        AUTOTEST_COLORS_ENABLED=no
+        EOF
+        # sudo fails with PAM errors in the fedora_43 image and we run as root
+        # anyway, so drop it and its -E, as the cijoe container jobs do.
+        sudo() { "${@:2}"; }
+        export -f sudo
+        ./autorun.sh ../ocf.conf
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v7.0.1
+      if: always()
+      with:
+        path: ./output
+        name: unvertical-job-ocf
+
+    - name: Release hugepages
+      if: always()
+      run: |
+        rm -f /dev/hugepages/spdk*map_* 2> /dev/null || true
+        echo 0 > /proc/sys/vm/nr_hugepages
+        left=$(awk '/^HugePages_Total:/ { print $2 }' /proc/meminfo)
+        (( left == 0 )) || echo "::warning::$left hugepages still held after release"

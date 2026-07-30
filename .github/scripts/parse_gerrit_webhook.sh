@@ -5,7 +5,7 @@ echo "SPDK: (${CHANGE_NUM}/${PATCH_SET}) ${TITLE}" >> "${GITHUB_STEP_SUMMARY}"
 echo "Gerrit: <https://review.spdk.io/c/spdk/spdk/+/${CHANGE_NUM}/${PATCH_SET}>" >> "${GITHUB_STEP_SUMMARY}"
 
 # Get latest info about a change itself
-curl -s -X GET "https://review.spdk.io/changes/spdk%2Fspdk~${CHANGE_NUM}?o=DETAILED_ACCOUNTS&o=LABELS&o=SKIP_DIFFSTAT&o=CURRENT_REVISION&o=ALL_FILES" \
+curl -s -X GET "https://review.spdk.io/changes/spdk%2Fspdk~${CHANGE_NUM}?o=DETAILED_ACCOUNTS&o=LABELS&o=SKIP_DIFFSTAT&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=ALL_FILES" \
 | tail -n +2 >  change.json
 
 if [[ ! -s change.json ]]; then
@@ -38,3 +38,12 @@ fi
 
 # Get list of files to skip some tests later depending on what files were touched
 echo "changed_files=$(jq -c -r '.revisions[].files | keys' change.json)" >> "$GITHUB_OUTPUT"
+
+# OCF tests run only on master changes touching OCF (including env and tests),
+# or marked as bdev/ocf in the commit message (e.g. OCF RPCs in shared files).
+ocf_changed=$(jq '.branch == "master" and
+  (([.revisions[].files | to_entries[] | .key, (.value.old_path // empty)]
+    | any(. == "ocf" or startswith("lib/env_ocf/") or startswith("module/bdev/ocf/")
+        or startswith("test/ocf/")))
+  or any(.revisions[].commit.message // ""; contains("bdev/ocf")))' change.json)
+echo "ocf_changed=${ocf_changed:-false}" >> "$GITHUB_OUTPUT"
