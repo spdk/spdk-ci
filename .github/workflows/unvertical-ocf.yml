@@ -1,0 +1,144 @@
+---
+name: Unvertical OCF tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      gerrit_ref:
+        description: 'Gerrit refspec to test following refs/changes/${change_number: -2}/${change_number}/${patch_set} format'
+        required: false
+        type: string
+        default: ''
+      test_script:
+        description: 'OCF test script to run.'
+        required: false
+        type: choice
+        options:
+        - test/ocf/ocf.sh
+        - test/ocf/ocf_all.sh
+        default: test/ocf/ocf.sh
+      timeout_minutes:
+        description: 'Job timeout in minutes.'
+        required: false
+        type: number
+        default: 30
+  workflow_call:
+    inputs:
+      client_payload:
+        required: false
+        type: string
+        default: ''
+      changed_files:
+        required: false
+        type: string
+        default: ''
+      test_script:
+        required: false
+        type: string
+        default: test/ocf/ocf.sh
+      timeout_minutes:
+        required: false
+        type: number
+        default: 30
+
+jobs:
+  unvertical-ocf:
+    name: ${{ inputs.test_script }}
+    # Run only for patch sets touching the OCF adapter, or when a ref was
+    # given by hand via workflow_dispatch.
+    if: |
+      inputs.gerrit_ref != '' ||
+      contains(inputs.changed_files, '"module/bdev/ocf/') ||
+      contains(inputs.changed_files, '"test/ocf/')
+    runs-on: [self-hosted, unvertical-ocf-vm]
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/spdk/spdk-ci:fedora_43
+      options: --privileged
+      volumes:
+      - "/dev/hugepages:/dev/hugepages"
+    env:
+      gerrit_ref: ${{ inputs.client_payload != '' && fromJson(inputs.client_payload).patchSet.ref || inputs.gerrit_ref }}
+      spdk_path: './spdk'
+      test_script: ${{ inputs.test_script }}
+      hugemem: 4096
+      AUTOTEST_COLORS_ENABLED: 'no'
+    steps:
+      # Required to use locally defined actions
+    - name: Checkout the spdk-ci repo locally
+      uses: actions/checkout@v7
+    - name: Checkout SPDK repo from Gerrit
+      uses: ./.github/actions/checkout_gerrit
+      with:
+        gerrit_ref: ${{ env.gerrit_ref }}
+        spdk_path: ${{ env.spdk_path }}
+
+    - name: Check the patch set carries the OCF tests
+      working-directory: ${{ env.spdk_path }}
+      run: |
+        if ! grep -q '^persistent_dev_id=("$OCF_AIO_DIR' test/ocf/common.sh 2> /dev/null; then
+          echo "FATAL: test/ocf/common.sh does not back persistent devices with aio bdevs." >&2
+          echo "This workflow needs the OCF v2 series; point gerrit_ref at it." >&2
+          exit 1
+        fi
+        if [[ ! -x $test_script ]]; then
+          echo "FATAL: $test_script is missing from this patch set." >&2
+          exit 1
+        fi
+
+    - name: Release hugepages left by an earlier run
+      # Hugepages outlive the container, so a previous run's leftovers are this
+      # run's problem. (The aio images do not - they live in the workspace, which
+      # actions/checkout cleans.)
+      run: |
+        # Files in the hugetlbfs mount pin pages and would make the shrink below
+        # quietly under-deliver. This is what scripts/setup.sh's reset does.
+        rm -f /dev/hugepages/spdk*map_* 2> /dev/null || true
+        echo 0 > /proc/sys/vm/nr_hugepages
+        awk '/^HugePages_Total:/ { print "HugePages_Total after release: " $2 }' /proc/meminfo
+
+    - name: Build
+      working-directory: ${{ env.spdk_path }}
+      run: |
+        set -e
+        cat > ../ocf.conf << 'EOF'
+        SPDK_RUN_FUNCTIONAL_TEST=1
+        SPDK_TEST_OCF=1
+        SPDK_RUN_ASAN=0
+        SPDK_RUN_UBSAN=1
+        EOF
+        ./autobuild.sh ../ocf.conf
+
+    - name: Allocate hugepages
+      # Allocate hugepages after the build. Otherwise on small 8G VM
+      # we end up with ~3.2G for compilation, which with -j 4 causes OOM.
+      run: .github/scripts/allocate_hugepages.sh "$((hugemem / 2))"
+
+    - name: Run ${{ env.test_script }}
+      # autorun.sh, which the other vendor workflows use, generates
+      # all_tests.txt as a side effect. Running the test script directly
+      # means doing it by hand, or the summary and false-positive tooling
+      # has nothing to read.
+      working-directory: ${{ env.spdk_path }}
+      run: |
+        set -e
+        ( rootdir=$PWD; source ./test/common/autotest_common.sh; create_test_list )
+        "./$test_script"
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v7.0.1
+      if: always()
+      with:
+        path: ./output
+        name: unvertical-job-ocf
+
+    - name: Release hugepages
+      if: always()
+      run: |
+        rm -f /dev/hugepages/spdk*map_* 2> /dev/null || true
+        echo 0 > /proc/sys/vm/nr_hugepages
+        left=$(awk '/^HugePages_Total:/ { print $2 }' /proc/meminfo)
+        (( left == 0 )) || echo "::warning::$left hugepages still held after release"
