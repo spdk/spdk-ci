@@ -47,6 +47,12 @@ on:
         - fedora_43
         - freebsd_14
         default: 'fedora_43'
+  push:
+    branches: ["main"]
+    paths:
+    - '.github/workflows/build_docker.yml'
+    - 'cijoe/configs/qemuhost-with-guest-*.toml'
+    - 'cijoe/workflows/build_docker_using_qcow2.yaml'
 
 jobs:
   select_vm_image:
