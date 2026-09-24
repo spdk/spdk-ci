@@ -181,6 +181,7 @@ jobs:
         - {name: iscsi-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: short-fuzz-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
         - {name: vfio-user-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
+        - {name: vhost-user-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: check-format-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: unittest-gcc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
         - {name: unittest-clang-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
@@ -221,8 +222,8 @@ jobs:
 
     steps:
     # Reserve hugepages before any following steps fragment host memory.
-    - name: Pre-allocate hugepages for vfio-user
-      if: matrix.workflow.name == 'vfio-user-container-autotest'
+    - name: Pre-allocate hugepages
+      if: matrix.workflow.name == 'vfio-user-container-autotest' || matrix.workflow.name == 'vhost-user-container-autotest'
       shell: bash
       run: |
         nr_hp=/proc/sys/vm/nr_hugepages

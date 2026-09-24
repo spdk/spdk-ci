@@ -145,6 +145,7 @@ jobs:
     - name: Push to ghcr.io
       if: ${{ github.event.inputs.push_to_registry == 'true' }}
       run: |
+        IMAGE_ID=$(echo "${IMAGE_ID}" | tr '[:upper:]' '[:lower:]')
         docker images
         docker tag spdk-ci:${{ inputs.distro }} ${IMAGE_ID}
         docker push ${IMAGE_ID}
