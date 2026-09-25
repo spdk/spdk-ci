@@ -222,8 +222,8 @@ jobs:
 
     steps:
     # Reserve hugepages before any following steps fragment host memory.
-    - name: Pre-allocate hugepages
-      if: matrix.workflow.name == 'vfio-user-container-autotest' || matrix.workflow.name == 'vhost-user-container-autotest'
+    - name: Pre-allocate hugepages for vfio-user
+      if: matrix.workflow.name == 'vfio-user-container-autotest'
       shell: bash
       run: |
         nr_hp=/proc/sys/vm/nr_hugepages
