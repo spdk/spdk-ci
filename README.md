@@ -53,15 +53,39 @@ or manage artifacts of the SPDK CI repository, shall be placed in `.github/actio
 
 ## Locally testing actions
 
-install see <https://nektosact.com/installation>
-
-or use [GitHub CLI](https://cli.github.com/)
+### Installation
+See: <https://nektosact.com/installation> or use [GitHub CLI](https://cli.github.com/) to install the extension.
 
 ```bash
 gh extension install https://github.com/nektos/gh-act
 ```
 
-list all actions
+### Before running locally
+
+Workflows containing jobs executing SPDK tests (like `spdk-common-tests.yml`) require a qcow2 image to be available.
+`spdk-common-tests.yml` will attempt to download the qcow2 image from local `gh act` cache or from GitHub Actions artifacts,
+and will do so for every workflow execution.
+
+It is advised to have a local copy of Qcow2 artifacts to reduce the need to download them from Github Actions every time.
+
+In order to do so:
+
+* If using a forked `spdk-ci` repository:
+    * Build the images using `SPDK-CI build VM image` in your forked repository. This workflow witll archive and cache the
+    images on Github side.
+    * Optionally follow up with `SPDK-CI build Docker image` as well, so that Qcow2 images are converted into Docker images
+    and uploaded to ghcr.io associated with your forked repository.
+    * Locally, using `gh act` run `Reupload qcow2 vm images` workflow.
+    This will download a copy of the images from your forked repository's Github Actions and cache them locally.
+
+    ```bash
+    $ gh act --artifact-server-path=$HOME/.cache/act -W .github/workflows/reupload_qcow2.yml -v workflow_dispatch
+    ```
+    `--cache-server-path` has a default value, so does not have to be provided in the command.
+* If using a clone of `spdk/spdk-ci` repository:
+    * Run `Reupload qcow2 vm images` workflow as in the exemple in previous point.
+
+### Listing jobs and workflows
 
 ```bash
 $ gh act --list
@@ -78,16 +102,31 @@ Stage  Job ID          Job name        Workflow name                Workflow fil
 2      report          report          SPDK per-patch common tests  spdk-common-tests.yml       workflow_dispatch,workflow_call
 ```
 
-run all common tests
+### Running jobs and workflows
 
+Running common tests with a workflow_dispatch event:
 ```bash
  $ gh act --job tests --secret GITHUB_TOKEN=$(gh auth token) workflow_dispatch
 ```
 
-run a workflow using repository_dispatch event (example events provided in `.github/example_events`)
+Running a workflow using repository_dispatch event (example events provided in `.github/example_events`):
 
 ```bash
  $ gh act --job parse_comment --secret GITHUB_TOKEN=$(gh auth token) -e .github/example_events/comment-added.json repository_dispatch
 ```
 
 for more examples, visit <https://nektosact.com/>
+
+Some of the workflow (like for example build_docker.yml or gerrit-false-positives-handler.yml) require the GitHub CLI to be installed,
+which is not included in the default act containers (e.g. catthehacker/ubuntu:act-latest). To run these workflows and not encounter
+"command not found" errors, you can use the Dockerfile in `act` directory:
+
+```bash
+docker build -t spdk-act ./act
+```
+
+and then use this image to replace the default act image during workflow execution:
+
+```bash
+gh act -P ubuntu-latest=spdk-act:latest --job build-docker  --input distro=fedora_43
+```
