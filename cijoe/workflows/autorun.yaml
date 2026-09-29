@@ -96,47 +96,47 @@ steps:
 
 - name: unittest-gcc-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/unittest-gcc-container-autotest.conf && ocf_precompile && unittest_build && ./test/unit/unittest.sh
+    /opt/spdk/autorun.sh /opt/configs/unittest-gcc-container-autotest.conf
 
 - name: unittest-clang-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && export CC=/usr/bin/clang CXX=/usr/bin/clang++ && source ./test/common/autobuild_common.sh /opt/configs/unittest-clang-container-autotest.conf && ocf_precompile && unittest_build && ./test/unit/unittest.sh
+    /opt/spdk/autorun.sh /opt/configs/unittest-clang-container-autotest.conf
 
 - name: unittest-valgrind-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/unittest-valgrind-container-autotest.conf && ocf_precompile && unittest_build && ./test/unit/unittest.sh
+    /opt/spdk/autorun.sh /opt/configs/unittest-valgrind-container-autotest.conf
 
 - name: check-format-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/check-format-container-autotest.conf && check_format
+    /opt/spdk/autorun.sh /opt/configs/check-format-container-autotest.conf
 
 - name: release-build-gcc-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/release-build-gcc-container-autotest.conf && build_release
+    /opt/spdk/autorun.sh /opt/configs/release-build-gcc-container-autotest.conf
 
 - name: release-build-clang-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && export CC=/usr/bin/clang CXX=/usr/bin/clang++ && source ./test/common/autobuild_common.sh /opt/configs/release-build-clang-container-autotest.conf && build_release
+    /opt/spdk/autorun.sh /opt/configs/release-build-clang-container-autotest.conf
 
 - name: doc-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/empty.conf && build_doc
+    /opt/spdk/autorun.sh /opt/configs/doc-container-autotest.conf
 
 - name: build-files-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/empty.conf && build_files && dpdk_pci_api
+    /opt/spdk/autorun.sh /opt/configs/build-files-container-autotest.conf
 
 - name: scan-build-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/scan-build-container-autotest.conf && ocf_precompile && scanbuild_make
+    /opt/spdk/autorun.sh /opt/configs/scan-build-container-autotest.conf
 
 - name: check-so-deps-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/check-so-deps-container-autotest.conf && ocf_precompile && SPDK_ABI_DIR=/opt/spdk-abi check_so_deps
+    /opt/spdk/autorun.sh /opt/configs/check-so-deps-container-autotest.conf
 
 - name: packaging-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/packaging-container-autotest.conf && build_packaging
+    /opt/spdk/autorun.sh /opt/configs/packaging-container-autotest.conf
 
 - name: short-fuzz-vm-autotest
   run: |
