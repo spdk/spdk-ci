@@ -7,6 +7,45 @@ name: SPDK per-patch common tests
 on:
   workflow_dispatch:
     inputs:
+      job:
+        description: 'Common job to run. Select all for the full matrix'
+        required: false
+        type: choice
+        default: all
+        options:
+        - all
+        - nvme-vm-autotest
+        - raid-vm-autotest
+        - bdev-vm-autotest
+        - nvmf-tcp-vm-autotest
+        - nvmf-tcp-uring-vm-autotest
+        - iscsi-vm-autotest
+        - iscsi-uring-vm-autotest
+        - short-fuzz-vm-autotest
+        - vfio-user-container-autotest
+        - check-format-container-autotest
+        - unittest-gcc-container-autotest
+        - unittest-clang-container-autotest
+        - unittest-valgrind-container-autotest
+        - release-build-gcc-container-autotest
+        - release-build-clang-container-autotest
+        - doc-container-autotest
+        - build-files-container-autotest
+        - scan-build-container-autotest
+        - check-so-deps-container-autotest
+        - packaging-container-autotest
+        - ftl-vm-autotest
+        - freebsd-vm-autotest
+      repeat:
+        description: 'Executions of the selected job (1-256)'
+        required: false
+        type: number
+        default: 1
+      max_parallel:
+        description: 'Maximum simultaneous executions of the selected job (1-20)'
+        required: false
+        type: number
+        default: 10
       gerrit_ref:
         description: 'Gerrit refspec to test following refs/changes/${change_number: -2}/${change_number}/${patch_set} format'
         required: false
@@ -34,8 +73,8 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.client_payload != '' && fromJson(inputs.client_payload).change.number
-    || inputs.gerrit_ref }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ inputs.job != '' && inputs.job != 'all' && format('selected-{0}',
+    github.run_id) || inputs.client_payload != '' && fromJson(inputs.client_payload).change.number || inputs.gerrit_ref }}
   cancel-in-progress: true
 
 env:
@@ -50,6 +89,69 @@ jobs:
     - name: Checkout the spdk-ci repo locally
       uses: actions/checkout@v7
 
+    - name: Prepare common job matrix
+      id: matrix
+      env:
+        SELECTED_JOB: ${{ inputs.job }}
+        FORCE_PKGDEP: ${{ inputs.force_pkgdep }}
+        REPEAT: ${{ inputs.repeat }}
+        MAX_PARALLEL: ${{ inputs.max_parallel }}
+      run: |
+        if [[ "$SELECTED_JOB" == all ]]; then
+          SELECTED_JOB=""
+        fi
+        REPEAT=${REPEAT:-1}
+        MAX_PARALLEL=${MAX_PARALLEL:-10}
+        if [[ ! "$REPEAT" =~ ^[0-9]{1,3}$ ]] || (( 10#$REPEAT < 1 || 10#$REPEAT > 256 )); then
+          echo "repeat must be a whole number from 1 to 256" >&2
+          exit 1
+        fi
+        count=$(( 10#$REPEAT ))
+        if [[ -z "$SELECTED_JOB" ]] && (( count != 1 )); then
+          echo "Repeating jobs requires selecting one common job" >&2
+          exit 1
+        fi
+        source_suffix=""
+        max_parallel=256
+        jobs=$(jq -ec --arg name "$SELECTED_JOB" --arg repository "$GITHUB_REPOSITORY" '
+          (if $name == "" then . else map(select(.name == $name)) end)
+          | map(. + {container_image:
+            (if .guest then "ghcr.io/refenv/cijoe-docker:v0.9.54"
+            else "ghcr.io/\($repository):fedora_43" end)})
+        ' .github/common-jobs.json)
+        if [[ -n "$SELECTED_JOB" ]]; then
+          if [[ "$FORCE_PKGDEP" == true ]]; then
+            echo "A selected job requires force_pkgdep=false" >&2
+            exit 1
+          fi
+          if [[ $(jq length <<< "$jobs") != 1 ]]; then
+            echo "Unknown or ambiguous common job: $SELECTED_JOB" >&2
+            exit 1
+          fi
+          if [[ ! "$MAX_PARALLEL" =~ ^[0-9]{1,3}$ ]] || (( 10#$MAX_PARALLEL < 1 || 10#$MAX_PARALLEL > 20 )); then
+            echo "max_parallel must be a whole number from 1 to 20" >&2
+            exit 1
+          fi
+          max_parallel=$(( 10#$MAX_PARALLEL ))
+          image=$(jq -r '.[0].container_image' <<< "$jobs")
+          manifest=$(docker buildx imagetools inspect "$image" --format '{{json .Manifest}}')
+          digest=$(jq -er '.digest | select(. != null and . != "")' <<< "$manifest")
+          jobs=$(jq -c --arg image "$image@$digest" 'map(. + {container_image: $image})' <<< "$jobs")
+          jobs=$(jq -c --argjson count "$count" '
+            .[0] as $job
+            | [range(1; $count + 1) as $sample | $job + {sample: $sample}]
+          ' <<< "$jobs")
+          source_suffix="-a$GITHUB_RUN_ATTEMPT"
+        fi
+        matrix=$(jq -c '{include: .}' <<< "$jobs")
+        vm_distros=$(jq -c '[.[] | select(.needs_vm_image) | .distro] | unique' <<< "$jobs")
+        {
+          echo "matrix=$matrix"
+          echo "vm_distros=$vm_distros"
+          echo "source_suffix=$source_suffix"
+          echo "max_parallel=$max_parallel"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Prepare SPDK repo by checking out from Gerrit
       uses: ./.github/actions/checkout_gerrit
       with:
@@ -62,7 +164,7 @@ jobs:
     - name: Upload the repository tarball as an artifact
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: repo-spdk
+        name: repo-spdk${{ steps.matrix.outputs.source_suffix }}
         path: spdk.tar.gz
 
     - name: Checkout the spdk-abi repo
@@ -78,29 +180,84 @@ jobs:
     - name: Upload the abi tarball as an artifact
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: repo-spdk-abi
+        name: repo-spdk-abi${{ steps.matrix.outputs.source_suffix }}
         path: spdk-abi.tar.gz
 
-    - name: Select latest qcow2 artifact
-      id: get_artifact_id
-      # TODO: make it a composite action for reuse
+    - name: Select Fedora VM image
+      id: fedora_image
+      if: contains(fromJSON(steps.matrix.outputs.vm_distros), 'fedora_43')
       env:
         GH_TOKEN: ${{ github.token }}
+      run: bash .github/scripts/select_vm_image.sh fedora_43 >> "$GITHUB_OUTPUT"
+
+    - name: Select FreeBSD VM image
+      id: freebsd_image
+      if: contains(fromJSON(steps.matrix.outputs.vm_distros), 'freebsd_14')
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: bash .github/scripts/select_vm_image.sh freebsd_14 >> "$GITHUB_OUTPUT"
+
+    - name: Check selected VM image
+      if: inputs.job != '' && inputs.job != 'all'
+      env:
+        MATRIX: ${{ steps.matrix.outputs.matrix }}
+        VM_IMAGES: >-
+          {"fedora_43": ${{ toJSON(steps.fedora_image.outputs) }},
+           "freebsd_14": ${{ toJSON(steps.freebsd_image.outputs) }}}
       run: |
-        set -x
-        fedora_43=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-fedora_43_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
-        freebsd_14=$(gh api --paginate "/repos/${{ github.repository }}/actions/artifacts?name=vm-image-freebsd_14_x86_64" -q '.artifacts |= sort_by(.updated_at)[-1] | .artifacts.workflow_run.id')
-        [[ -z "${fedora_43}" ]] && echo "fedora_43 is empty" && exit 1
-        [[ -z "${freebsd_14}" ]] && echo "freebsd_14 is empty" && exit 1
-        echo "artifact_id={'fedora_43':$fedora_43,'freebsd_14':$freebsd_14}" >> "$GITHUB_OUTPUT"
+        distro=$(jq -r '.include[0] | select(.needs_vm_image) | .distro' <<< "$MATRIX")
+        if [[ -n "$distro" ]]; then
+          artifact_id=$(jq -r --arg distro "$distro" '.[$distro].artifact_id // empty' <<< "$VM_IMAGES")
+          if [[ -z "$artifact_id" ]]; then
+            echo "No unexpired VM artifact available for selected job ($distro)" >&2
+            exit 1
+          fi
+        fi
+
+    - name: Record selected job inputs
+      if: inputs.job != '' && inputs.job != 'all'
+      env:
+        MATRIX: ${{ steps.matrix.outputs.matrix }}
+        MAX_PARALLEL: ${{ steps.matrix.outputs.max_parallel }}
+        VM_IMAGES: >-
+          {"fedora_43": ${{ toJSON(steps.fedora_image.outputs) }},
+           "freebsd_14": ${{ toJSON(steps.freebsd_image.outputs) }}}
+      run: |
+        spdk_sha=$(git -C "$spdk_path" rev-parse HEAD)
+        abi_sha=$(git -C spdk-abi rev-parse HEAD)
+        ci_sha=$(git rev-parse HEAD)
+        image=$(jq -r '.include[0].container_image' <<< "$MATRIX")
+        distro=$(jq -r '.include[0] | select(.needs_vm_image) | .distro' <<< "$MATRIX")
+        {
+          echo "Selected common job inputs (preparation attempt $GITHUB_RUN_ATTEMPT):"
+          echo ""
+          echo "- Samples: $(jq '.include | length' <<< "$MATRIX")"
+          echo "- Maximum parallelism: $MAX_PARALLEL"
+          echo "- SPDK: $spdk_sha"
+          echo "- SPDK ABI: $abi_sha"
+          echo "- SPDK-CI: $ci_sha"
+          echo "- Container: $image"
+          if [[ -n "$distro" ]]; then
+            echo "- VM artifact: $(jq -r --arg distro "$distro" '.[$distro].artifact_id' <<< "$VM_IMAGES")"
+            echo "- VM artifact run: $(jq -r --arg distro "$distro" '.[$distro].run_id' <<< "$VM_IMAGES")"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
     outputs:
-      artifact_id: ${{ steps.get_artifact_id.outputs.artifact_id }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      source_suffix: ${{ steps.matrix.outputs.source_suffix }}
+      max_parallel: ${{ steps.matrix.outputs.max_parallel }}
+      vm_images: >-
+        {"fedora_43": ${{ toJSON(steps.fedora_image.outputs) }},
+         "freebsd_14": ${{ toJSON(steps.freebsd_image.outputs) }}}
 
   pkgdep:
     if: |
-      contains(inputs.changed_files, 'pkgdep') ||
-      contains(inputs.changed_files, 'autotest_setup.sh') ||
-      inputs.force_pkgdep == true
+      (inputs.job == '' || inputs.job == 'all') && (
+        contains(inputs.changed_files, 'pkgdep') ||
+        contains(inputs.changed_files, 'autotest_setup.sh') ||
+        inputs.force_pkgdep == true
+      )
     needs:
     - checkout_spdk
     strategy:
@@ -174,55 +331,29 @@ jobs:
         make -j
 
   autorun:
-    name: ${{ matrix.workflow.name }}
+    name: ${{ matrix.sample && format('{0} sample {1}', matrix.name, matrix.sample) || matrix.name }}
     needs:
     - checkout_spdk
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      matrix:
-        workflow:
-        - {name: nvme-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: raid-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: bdev-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: nvmf-tcp-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: nvmf-tcp-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: iscsi-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: iscsi-uring-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: short-fuzz-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-        - {name: vfio-user-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: check-format-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: unittest-gcc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: unittest-clang-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: unittest-valgrind-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: release-build-gcc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: release-build-clang-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: doc-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: build-files-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: scan-build-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: check-so-deps-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        - {name: packaging-container-autotest, container_image: "ghcr.io/${{ github.repository }}:fedora_43", cijoe_config_prefix: container}
-        include:
-        - distro: "fedora_43"
-        - nvme_setup: "zns"
-        - workflow: {name: ftl-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-          nvme_setup: "ftl"
-          distro: "fedora_43"
-        - workflow: {name: freebsd-vm-autotest, container_image: ghcr.io/refenv/cijoe-docker:v0.9.54, cijoe_config_prefix: qemuhost-with-guest}
-          nvme_setup: "default"
-          distro: "freebsd_14"
+      fail-fast: ${{ inputs.job == '' || inputs.job == 'all' }}
+      max-parallel: ${{ fromJSON(needs.checkout_spdk.outputs.max_parallel) }}
+      matrix: ${{ fromJSON(needs.checkout_spdk.outputs.matrix) }}
 
     env:
+      ARTIFACT_SUFFIX: ${{ matrix.sample && format('-r{0}-a{1}', matrix.sample, github.run_attempt) || '' }}
       REPOSITORY_TARBALL_PATH: ${{ github.workspace }}/spdk.tar.gz
       ABI_TARBALL_PATH: ${{ github.workspace }}/spdk-abi.tar.gz
       CI_CFGS_REPOSITORY_PATH: ${{ github.workspace }}/ci/cijoe/configs/autorun_configs
       NVME_SETUP: ${{ matrix.nvme_setup }}
       DISTRO: ${{ matrix.distro }}
       GITHUB_WORKSPACE: ${{ github.workspace }}
+      CIJOE_DEFAULT_CONFIG: configs/${{ matrix.guest && 'qemuhost-with-guest' || 'container' }}-${{ matrix.distro }}.toml
 
     # TODO: Figure out how to pass volumes variable to container context
     container:
-      image: ${{ matrix.workflow.container_image }}
+      image: ${{ matrix.container_image }}
       options: --device=/dev/kvm --privileged
       volumes:
       - "/dev/hugepages:/dev/hugepages"
@@ -232,7 +363,7 @@ jobs:
     steps:
     # Reserve hugepages before any following steps fragment host memory.
     - name: Pre-allocate hugepages for vfio-user
-      if: matrix.workflow.name == 'vfio-user-container-autotest'
+      if: matrix.name == 'vfio-user-container-autotest'
       shell: bash
       run: |
         nr_hp=/proc/sys/vm/nr_hugepages
@@ -265,7 +396,7 @@ jobs:
     # cijoe - for running cijoe workflows instead of writing own manual scrits;
     #         TODO: Installation doesn't take long but we should bake it into the container image.
     - name: Install cijoe
-      if: ${{ contains(matrix.workflow.name, 'container') }}
+      if: ${{ !matrix.guest }}
       run: |
         pip install cijoe==0.9.54
 
@@ -298,20 +429,15 @@ jobs:
     - name: Download the SPDK repository
       uses: actions/download-artifact@v8.0.1
       with:
-        name: repo-spdk
+        name: repo-spdk${{ needs.checkout_spdk.outputs.source_suffix }}
 
     - name: Download the SPDK ABI repository
       uses: actions/download-artifact@v8.0.1
       with:
-        name: repo-spdk-abi
-
-    - name: Extract the SPDK repository
-      run: |
-        tar xzf spdk.tar.gz --strip 1
-        tar xzf spdk-abi.tar.gz --strip 1
+        name: repo-spdk-abi${{ needs.checkout_spdk.outputs.source_suffix }}
 
     - name: Restore qcow2 image from cache
-      if: contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')
+      if: matrix.needs_vm_image && (inputs.job == '' || inputs.job == 'all')
       id: restore-qcow2
       uses: actions/cache/restore@v6
       with:
@@ -320,54 +446,70 @@ jobs:
 
     - name: Download VM Qcow2 image artifact
       uses: actions/download-artifact@v8.0.1
-      if: (contains(matrix.workflow.name, 'vm')  || contains(matrix.workflow.name, 'vfio-user')) && hashFiles(format('{0}_x86_64.qcow2',
-        matrix.distro)) == ''
+      if: matrix.needs_vm_image && fromJSON(needs.checkout_spdk.outputs.vm_images)[matrix.distro].artifact_id != '' && ((inputs.job
+        != '' && inputs.job != 'all') || hashFiles(format('{0}_x86_64.qcow2', matrix.distro)) == '')
       with:
-        name: vm-image-${{matrix.distro}}_x86_64
+        artifact-ids: ${{ fromJSON(needs.checkout_spdk.outputs.vm_images)[matrix.distro].artifact_id }}
         github-token: ${{ github.token }}
-        run-id: ${{ fromJson(needs.checkout_spdk.outputs.artifact_id)[ matrix.distro ] }}
+        run-id: ${{ fromJSON(needs.checkout_spdk.outputs.vm_images)[matrix.distro].run_id }}
+
+    - name: Check VM image availability
+      if: matrix.needs_vm_image
+      run: |
+        if [ ! -f "${DISTRO}_x86_64.qcow2" ]; then
+          echo "No VM image available for $DISTRO" >&2
+          exit 1
+        fi
 
     - name: qemu-guest, initialize
-      if: ${{ contains(matrix.workflow.name, 'vm') }}
+      if: ${{ matrix.guest }}
       run: |
         cd ci/cijoe
         cijoe workflows/autorun.yaml guest_initialize guest_start guest_check \
-        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow.name }}_prep_guest \
+        --output report_${{ matrix.name }}_prep_guest \
         --monitor
 
     - name: qemu-guest, provision
       run: |
         cd ci/cijoe
         cijoe workflows/autorun.yaml guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
-        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow.name }}_provision \
+        --output report_${{ matrix.name }}_provision \
         --monitor
 
-    - name: qemu-guest, ${{ matrix.workflow.name }}
+    - name: qemu-guest, ${{ matrix.name }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml ${{ matrix.workflow.name }} \
-        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow.name }} \
+        cijoe workflows/autorun.yaml ${{ matrix.name }} \
+        --output report_${{ matrix.name }} \
         --monitor
 
-    - name: qemu-guest, cleanup
-      if: always() && hashFiles('ci/cijoe')
+    # Preserve local reports before contacting a possibly unresponsive guest.
+    - name: Upload Report
+      uses: actions/upload-artifact@v7.0.1
+      if: always()
+      with:
+        path: |
+          ci/cijoe/report_${{ matrix.name }}
+          ci/cijoe/report_${{ matrix.name }}_prep_guest
+          ci/cijoe/report_${{ matrix.name }}_provision
+        name: common-cijoe-${{ matrix.name }}${{ env.ARTIFACT_SUFFIX }}
+
+    - name: qemu-guest, list output
+      if: always() && hashFiles('ci/cijoe/workflows/autorun.yaml')
+      timeout-minutes: 1
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml output_listing retrieve_autorun_output \
-        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow.name }}_cleanup \
+        cijoe workflows/autorun.yaml output_listing \
+        --output report_${{ matrix.name }}_cleanup \
         --monitor
 
-    - name: qemu-guest, shutdown
-      if: ${{ contains(matrix.workflow.name, 'vm') && contains(runner.labels, 'self-hosted') || env.ACT == 'true' }}
+    - name: qemu-guest, retrieve output
+      if: always() && hashFiles('ci/cijoe/workflows/autorun.yaml')
+      timeout-minutes: 3
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml guest_shutdown \
-        --config configs/${{ matrix.workflow.cijoe_config_prefix }}-${{matrix.distro}}.toml \
-        --output report_${{ matrix.workflow.name }}_guest_shutdown \
+        cijoe workflows/autorun.yaml retrieve_autorun_output \
+        --output report_${{ matrix.name }}_retrieve \
         --monitor
 
     - name: Upload Artifacts
@@ -375,14 +517,24 @@ jobs:
       if: always()
       with:
         path: /tmp/autorun_output
-        name: common-job-${{ matrix.workflow.name }}
+        name: common-job-${{ matrix.name }}${{ env.ARTIFACT_SUFFIX }}
 
-    - name: Upload Report
+    - name: qemu-guest, shutdown
+      if: always() && matrix.guest && hashFiles('ci/cijoe/workflows/autorun.yaml') && (runner.environment == 'self-hosted'
+        || env.ACT == 'true')
+      timeout-minutes: 2
+      run: |
+        cd ci/cijoe
+        cijoe workflows/autorun.yaml guest_shutdown \
+        --output report_${{ matrix.name }}_guest_shutdown \
+        --monitor
+
+    - name: Upload Cleanup Report
       uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
         path: |
-          ci/cijoe/report_${{ matrix.workflow.name }}
-          ci/cijoe/report_${{ matrix.workflow.name }}_cleanup
-          ci/cijoe/report_${{ matrix.workflow.name }}_prep_guest
-        name: common-cijoe-${{ matrix.workflow.name }}
+          ci/cijoe/report_${{ matrix.name }}_cleanup
+          ci/cijoe/report_${{ matrix.name }}_retrieve
+          ci/cijoe/report_${{ matrix.name }}_guest_shutdown
+        name: common-cijoe-${{ matrix.name }}-cleanup${{ env.ARTIFACT_SUFFIX }}
