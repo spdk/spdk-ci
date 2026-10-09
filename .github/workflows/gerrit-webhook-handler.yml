@@ -40,6 +40,11 @@ on:
 #   # Workaround for https://github.com/actions/runner/issues/2372
 #   client_payload: ${{ github.event.client_payload != '' && toJson(github.event.client_payload) || '' }}
 
+permissions:
+  actions: write  # Required for gh run cancel in patch_set_status
+  id-token: write # Required for Codecov OIDC in the summary workflow
+  contents: read
+
 jobs:
 
   patch_set_status:
