@@ -43,13 +43,13 @@ steps:
     guest_name: generic-bios-kvm-x86_64
 
 - name: guest_growparts
-  run: |
-    hostname
-    uname -a
-    df -h
+  run: >-
+    hostname;
+    uname -a;
+    df -h;
     growpart /dev/vda 4 || true
-    btrfs filesystem resize max / || true
-    df -h
+    btrfs filesystem resize max / || true;
+    df -h;
 
 - name: guest_update
   run: |
