@@ -1,0 +1,65 @@
+---
+name: Mergable changes preview
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+    - 'infra/mergable_changes/mergable_changes.py'
+    - 'infra/mergable_changes/template.html'
+    - '.github/workflows/mergable-changes-preview.yml'
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v7
+
+    - name: Install Python dependencies
+      run: pip install requests pygerrit2 prettytable jinja2
+
+    - name: Render HTML with live Gerrit data
+      working-directory: infra/mergable_changes
+      run: |
+        mkdir -p /tmp/mergable_changes
+        python3 mergable_changes.py
+      env:
+        RUN_ONCE: "true"
+        OUTPUT_DIR: /tmp/mergable_changes
+        LOG_FILE: /tmp/mergable_changes.log
+
+    - name: Upload rendered output
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: mergable-changes-preview
+        path: /tmp/mergable_changes/
+
+    - name: Post preview comment on PR
+      if: false
+      #if: github.event_name == 'pull_request'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Build comment body
+        {
+          echo '<!-- mergable-changes-preview -->'
+          echo '### Mergable Changes Page Preview'
+          echo 'Rendered with live Gerrit data.'
+          echo ''
+          echo '<details>'
+          echo '<summary>Click to expand</summary>'
+          echo ''
+          cat /tmp/mergable_changes/mergable_changes.html
+          echo ''
+          echo '</details>'
+        } > /tmp/mergable_changes/comment_body.md
+
+        # Post new comment
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --repo "${{ github.repository }}" \
+          --body-file /tmp/mergable_changes/comment_body.md
