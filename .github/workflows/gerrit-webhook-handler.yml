@@ -44,16 +44,17 @@ jobs:
 
   patch_set_status:
     name: Verify patch set state
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event.client_payload != ''
     outputs:
       changed_files: ${{ steps.patch.outputs.changed_files }}
+      ocf_changed: ${{ steps.patch.outputs.ocf_changed }}
       client_payload: ${{ env.client_payload }}
     env:
       GH_TOKEN: ${{ github.token }}
       client_payload: ${{ github.event.client_payload != '' && toJson(github.event.client_payload) || '' }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Check patch set status
       id: patch
       env:
@@ -76,13 +77,37 @@ jobs:
       force_pkgdep: ${{ github.event_name == 'pull_request' }}
 
   hpe:
-    name: NVMe-oF RDMA tests
+    name: HPE NVMe-oF tests
     if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' }}
     needs:
     - patch_set_status
-    uses: ./.github/workflows/nvmf-rdma.yml
+    uses: ./.github/workflows/hpe-nvmf.yml
     with:
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
+
+  nvidia:
+    name: Nvidia NVMe-oF tests
+    if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' }}
+    needs:
+    - patch_set_status
+    uses: ./.github/workflows/nvidia-nvmf.yml
+    with:
+      client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
+
+  unvertical:
+    name: Unvertical OCF tests
+    if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' && needs.patch_set_status.outputs.ocf_changed == 'true' }}
+    needs:
+    - patch_set_status
+    uses: ./.github/workflows/unvertical-ocf.yml
+    with:
+      client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
+      # Run the full test suite per patchset for now. The plan is to run the
+      # full suite until OCF rework is merged. After that we can swich to
+      # shorter CI suite and schedule the full suite as nightly scope.
+      full_suite: true
+      # The full suite takes ~2h20m on the Unvertical VM.
+      timeout_minutes: 180
   # Add more jobs below if needed.
 
 
@@ -94,10 +119,19 @@ jobs:
     - patch_set_status
     - common
     - hpe
+    - nvidia
+    - unvertical
     uses: ./.github/workflows/summary.yml
     with:
       client_payload: ${{ needs.patch_set_status.outputs.client_payload }}
       result: >-
-        ${{ (needs.common.result == 'success' && (needs.hpe.result == 'success' || needs.hpe.result == 'skipped')) &&
-        'success' || 'failure' }}
+        ${{
+          (
+            needs.common.result == 'success' &&
+            (needs.hpe.result == 'success' || needs.hpe.result == 'skipped') &&
+            (needs.nvidia.result == 'success' || needs.nvidia.result == 'skipped') &&
+            (needs.unvertical.result == 'success' || needs.unvertical.result == 'skipped')
+          ) &&
+          'success' || 'failure'
+        }}
     secrets: inherit

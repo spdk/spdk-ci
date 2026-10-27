@@ -21,7 +21,7 @@
       <section class="mb-5">
         <div class="card shadow-sm">
           <div class="card-header bg-success text-white">
-            <h5 class="mb-0">Changes ready for merge</h5>
+            <h5 class="mb-0">Changes ready for merge ({{ sections["Changes ready for merge"]|length }})</h5>
           </div>
           <div class="card-body">
             {% if sections["Changes ready for merge"] %}
@@ -30,6 +30,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -39,6 +40,7 @@
                     {% for change in sections["Changes ready for merge"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -54,11 +56,52 @@
         </div>
       </section>
 
+      <!-- Section: Stale Changes Needing Another +2 (14+ days) -->
+      <section class="mb-5">
+        <div class="card shadow-sm">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Stale changes needing another +2 CR vote (14+ days old) ({{ sections["Stale changes needing another +2 CR vote"]|length }})</h5>
+          </div>
+          <div class="card-body">
+            {% if sections["Stale changes needing another +2 CR vote"] %}
+              <div class="table-responsive">
+                <table class="table table-striped">
+                  <thead class="thead-dark">
+                    <tr>
+                      <th>Number</th>
+                      <th>Project</th>
+                      <th>Subject</th>
+                      <th>Owner</th>
+                      <th>Age</th>
+                      <th>Reviewed By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for change in sections["Stale changes needing another +2 CR vote"] %}
+                      <tr class="align-middle">
+                        <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
+                        <td>{{ change.subject }}</td>
+                        <td>{{ change.owner }}</td>
+                        <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
+                        <td>{{ change.reviewed_by }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="text-muted">No stale changes needing another +2 CR vote at this time.</p>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
       <!-- Section: Changes Needing Another +2 -->
       <section class="mb-5">
         <div class="card shadow-sm">
           <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">Changes needing another +2 CR vote</h5>
+            <h5 class="mb-0">Changes needing another +2 CR vote ({{ sections["Changes needing another +2 CR vote"]|length }})</h5>
           </div>
           <div class="card-body">
             {% if sections["Changes needing another +2 CR vote"] %}
@@ -67,6 +110,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -77,6 +121,7 @@
                     {% for change in sections["Changes needing another +2 CR vote"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -97,7 +142,7 @@
       <section class="mb-5">
         <div class="card shadow-sm">
           <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">Changes with -1 CR votes</h5>
+            <h5 class="mb-0">Changes with -1 CR votes ({{ sections["Changes with a -1 CR vote"]|length }})</h5>
           </div>
           <div class="card-body">
             {% if sections["Changes with a -1 CR vote"] %}
@@ -106,6 +151,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -115,6 +161,7 @@
                     {% for change in sections["Changes with a -1 CR vote"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -134,7 +181,7 @@
       <section class="mb-5">
         <div class="card shadow-sm">
           <div class="card-header bg-danger text-white">
-            <h5 class="mb-0">Changes with merge conflicts</h5>
+            <h5 class="mb-0">Changes with merge conflicts ({{ sections["Changes with a merge conflict"]|length }})</h5>
           </div>
           <div class="card-body">
             {% if sections["Changes with a merge conflict"] %}
@@ -143,6 +190,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -152,6 +200,7 @@
                     {% for change in sections["Changes with a merge conflict"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>
@@ -171,7 +220,7 @@
       <section class="mb-5">
         <div class="card shadow-sm">
           <div class="card-header bg-danger text-white">
-            <h5 class="mb-0">Changes blocked by parent changes</h5>
+            <h5 class="mb-0">Changes blocked by parent changes ({{ sections["Changes blocked by parents in series"]|length }})</h5>
           </div>
           <div class="card-body">
             {% if sections["Changes blocked by parents in series"] %}
@@ -180,6 +229,7 @@
                   <thead class="thead-dark">
                     <tr>
                       <th>Number</th>
+                      <th>Project</th>
                       <th>Subject</th>
                       <th>Owner</th>
                       <th>Age</th>
@@ -190,6 +240,7 @@
                     {% for change in sections["Changes blocked by parents in series"] %}
                       <tr class="align-middle">
                         <td><a href="{{ change.url }}" class="text-dark">{{ change.number }}</a></td>
+                        <td>{{ change.project }}</td>
                         <td>{{ change.subject }}</td>
                         <td>{{ change.owner }}</td>
                         <td>{{ change.age.days }} days, {{ change.hours }} hours</td>

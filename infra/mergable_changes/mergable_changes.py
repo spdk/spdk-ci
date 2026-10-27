@@ -17,12 +17,16 @@ class MergableChangesConfig:
     log_level: str = "INFO"
     output_dir: str = "/output"
     gerrit_url: str = "https://review.spdk.io"
+    log_file: str = "/var/log/mergable_changes.log"
+    run_once: bool = False
     gerrit_change_url: str = field(init=False)
 
     def __post_init__(self):
         self.log_level = os.getenv("LOG_LEVEL", self.log_level).upper()
         self.output_dir = os.getenv("OUTPUT_DIR", self.output_dir)
         self.gerrit_url = os.getenv("GERRIT_URL", self.gerrit_url).rstrip("/")
+        self.log_file = os.getenv("LOG_FILE", self.log_file)
+        self.run_once = os.getenv("RUN_ONCE", "").lower() in ("1", "true", "yes")
         self.gerrit_change_url = f"{self.gerrit_url}/c"
 
 config = MergableChangesConfig()
@@ -72,7 +76,7 @@ class GerritChange:
             number=change_json['_number'],
             project=change_json['project'],
             subject=change_json['subject'],
-            owner=change_json['owner']['name'],
+            owner=change_json['owner'].get('name', 'Owner not set'),
             revisions=change_json['revisions'].values(),
             blocked_by="",
             reviewed_by=reviewed_by,
@@ -132,7 +136,9 @@ class GerritChange:
 
 def get_gerrit_changes(gerrit, all_changes):
     query = "".join([
-        "/changes/", "?q=project:spdk/spdk status:open label:Code-Review=2 label:Verified=1",
+        "/changes/",
+        "?q=(project:spdk/spdk status:open label:Code-Review=2 label:Verified=1)",
+        " OR (-project:spdk/spdk status:open label:Code-Review=2)",
         "&o=CURRENT_REVISION", "&o=DETAILED_LABELS", "&o=DETAILED_ACCOUNTS", "&o=SUBMITTABLE"
     ])
     try:
@@ -153,8 +159,11 @@ def get_change_by_number(all_changes, number):
 def get_ready_changes(all_changes):
     return [c for c in all_changes if c.ready]
 
+def get_stale_needs_plus_two_changes(all_changes):
+    return [c for c in all_changes if c.needs_plus_two and c.age.days >= 14]
+
 def get_needs_plus_two_changes(all_changes):
-    return [c for c in all_changes if c.needs_plus_two]
+    return [c for c in all_changes if c.needs_plus_two and c.age.days < 14]
 
 def get_minus_one_changes(all_changes):
     return [c for c in all_changes if c.has_minus_one]
@@ -172,6 +181,7 @@ def write_text_summary(all_changes):
 
     sections = {
         "Changes ready for merge": get_ready_changes(all_changes),
+        "Stale changes needing another +2 CR vote": get_stale_needs_plus_two_changes(all_changes),
         "Changes needing another +2 CR vote": get_needs_plus_two_changes(all_changes),
         "Changes with a -1 CR vote": get_minus_one_changes(all_changes),
         "Changes with a merge conflict": get_merge_conflict_changes(all_changes),
@@ -189,13 +199,13 @@ def write_text_summary(all_changes):
             if changes:
                 table = PrettyTable()
                 table.align = "l"
-                field_names = ["Number", "Subject", "Owner", "URL", "Age"]
+                field_names = ["Number", "Project", "Subject", "Owner", "URL", "Age"]
                 field_names.append("Reviewed by") if "another +2 CR" in section_name else None
                 field_names.append("Blocked by") if "blocked" in section_name else None
                     
                 table.field_names = field_names
                 for change in changes:
-                    row_values = [change.number, change.subject, change.owner, change.url, f"{change.age.days:} days {change.hours} hours"]
+                    row_values = [change.number, change.project, change.subject, change.owner, change.url, f"{change.age.days:} days {change.hours} hours"]
                     row_values.append(change.reviewed_by) if "another +2 CR" in section_name else None
                     row_values.append(change.blocked_by.url) if "blocked" in section_name else None
                     table.add_row(row_values)
@@ -214,7 +224,7 @@ def main():
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler("/var/log/mergable_changes.log", mode="a")
+            logging.FileHandler(config.log_file, mode="a")
         ]
     )
 
@@ -226,6 +236,8 @@ def main():
             change.check_parents_ready(gerrit, all_changes)
         all_changes.sort(key=lambda c: c.age, reverse=True)
         write_text_summary(all_changes)
+        if config.run_once:
+            break
         time.sleep(300)
 
 if __name__ == '__main__':

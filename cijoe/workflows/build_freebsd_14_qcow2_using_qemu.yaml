@@ -43,18 +43,18 @@ steps:
     guest_name: generic-bios-kvm-x86_64
 
 - name: guest_growparts
-  run: |
-    hostname
-    uname -a
-    df -h
-    gpart show
-    gpart recover vtbd0
-    gpart resize -i 4 -s +10G vtbd0 || true
-    gpart show
-    zpool list
-    zpool online -e zroot vtbd0p4 || true
-    zpool list
-    df -h
+  run: >-
+    hostname;
+    uname -a;
+    df -h;
+    gpart show;
+    gpart recover vtbd0;
+    gpart resize -i 4 -s +10G vtbd0 || true;
+    gpart show;
+    zpool list;
+    zpool online -e zroot vtbd0p4 || true;
+    zpool list;
+    df -h;
 
 - name: guest_update
   run: |

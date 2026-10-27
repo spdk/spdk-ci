@@ -1,5 +1,5 @@
 ---
-name: nvmf-rdma-test
+name: HPE NVMe-oF tests
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
     steps:
       # Required to use locally defined actions
     - name: Checkout the spdk-ci repo locally
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Checkout SPDK repo from Gerrit
       uses: ./.github/actions/checkout_gerrit
       with:
@@ -46,7 +46,7 @@ jobs:
         EOF
         ./spdk/autorun.sh ./funtest.conf
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v7.0.0
+      uses: actions/upload-artifact@v7.0.2
       if: always()
       with:
         path: ./output
