@@ -5,6 +5,7 @@ RUN pip install requests \
 	pygerrit2
 COPY forwarder/forwarder.py /app/forwarder.py
 COPY forwarder/queue_status_template.html /app/queue_status_template.html
+COPY templates/ /templates/
 
 WORKDIR /app
 CMD [ "python", "forwarder.py"]

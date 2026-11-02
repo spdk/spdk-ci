@@ -177,8 +177,10 @@ def write_queue_snapshot(pending_events, dispatched_owners):
             "run_url": "",
         })
 
+    # The shared templates are in infra/templates, and in /templates in the image.
+    here = os.path.dirname(os.path.abspath(__file__))
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader("./"),
+        loader=jinja2.FileSystemLoader([here, os.path.join(here, "../templates")]),
         autoescape=jinja2.select_autoescape(["html"]))
     template = env.get_template("queue_status_template.html")
     html = template.render(

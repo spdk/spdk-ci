@@ -7,6 +7,7 @@ RUN pip install \
     jinja2
 COPY mergable_changes/mergable_changes.py /app/mergable_changes.py
 COPY mergable_changes/template.html /app/template.html
+COPY templates/ /templates/
 
 WORKDIR /app
 CMD [ "python", "mergable_changes.py"]
