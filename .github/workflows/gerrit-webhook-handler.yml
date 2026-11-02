@@ -66,7 +66,7 @@ jobs:
 
   common:
     name: Common tests
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.patch_set_status.result != 'failure' }}
     needs:
     - patch_set_status
     uses: ./.github/workflows/spdk-common-tests.yml
@@ -78,7 +78,7 @@ jobs:
 
   hpe:
     name: HPE NVMe-oF tests
-    if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' }}
+    if: ${{ !cancelled() && needs.patch_set_status.result != 'failure' && github.repository == 'spdk/spdk-ci' }}
     needs:
     - patch_set_status
     uses: ./.github/workflows/hpe-nvmf.yml
@@ -87,7 +87,7 @@ jobs:
 
   nvidia:
     name: Nvidia NVMe-oF tests
-    if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' }}
+    if: ${{ !cancelled() && needs.patch_set_status.result != 'failure' && github.repository == 'spdk/spdk-ci' }}
     needs:
     - patch_set_status
     uses: ./.github/workflows/nvidia-nvmf.yml
@@ -96,7 +96,10 @@ jobs:
 
   unvertical:
     name: Unvertical OCF tests
-    if: ${{ !cancelled() && github.repository == 'spdk/spdk-ci' && needs.patch_set_status.outputs.ocf_changed == 'true' }}
+    if: >-
+      ${{ !cancelled() && needs.patch_set_status.result != 'failure'
+          && github.repository == 'spdk/spdk-ci'
+          && needs.patch_set_status.outputs.ocf_changed == 'true' }}
     needs:
     - patch_set_status
     uses: ./.github/workflows/unvertical-ocf.yml
@@ -114,7 +117,7 @@ jobs:
   # Summary should be last job, please make sure to include yours in 'needs'.
   summary:
     name: Job summary
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.patch_set_status.result != 'failure' }}
     needs:
     - patch_set_status
     - common

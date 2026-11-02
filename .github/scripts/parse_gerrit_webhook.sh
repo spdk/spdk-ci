@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-set -ex
+set -euxo pipefail
 
 echo "SPDK: (${CHANGE_NUM}/${PATCH_SET}) ${TITLE}" >> "${GITHUB_STEP_SUMMARY}"
 echo "Gerrit: <https://review.spdk.io/c/spdk/spdk/+/${CHANGE_NUM}/${PATCH_SET}>" >> "${GITHUB_STEP_SUMMARY}"
 
 # Get latest info about a change itself
-curl -s -X GET "https://review.spdk.io/changes/spdk%2Fspdk~${CHANGE_NUM}?o=DETAILED_ACCOUNTS&o=LABELS&o=SKIP_DIFFSTAT&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=ALL_FILES" \
-| tail -n +2 >  change.json
+curl --silent --show-error \
+	--connect-timeout 10 --max-time 30 --retry 2 \
+	"https://review.spdk.io/changes/spdk%2Fspdk~${CHANGE_NUM}?o=DETAILED_ACCOUNTS&o=LABELS&o=SKIP_DIFFSTAT&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=ALL_FILES" \
+	| tail -n +2 > change.json
 
 if [[ ! -s change.json ]]; then
     echo "Change ${CHANGE_NUM} not found, exiting." >> "${GITHUB_STEP_SUMMARY}"

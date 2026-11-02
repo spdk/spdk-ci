@@ -10,7 +10,7 @@
 # GH_ISSUES_PAT: ${{ secrets.GH_ISSUES_PAT }}
 # change_num: ${{ fromJSON(needs.env_vars.outputs.client_payload).change.number }}
 # patch_set: ${{ fromJSON(needs.env_vars.outputs.client_payload).patchSet.number }}
-set -eu
+set -euo pipefail
 shopt -s extglob
 
 spdk_repo=$REPO
@@ -32,7 +32,7 @@ gh_issue=${BASH_REMATCH[1]}
 if ! gh_status=$(gh issue -R "$spdk_repo" view "$gh_issue" --json state --jq .state) \
 	|| [[ "$gh_status" != "OPEN" ]]; then
 	# shellcheck disable=SC2154
-	curl -L -X POST \
+	curl --connect-timeout 10 --max-time 30 --retry 2 -L -X POST \
 		--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
 		--header "Content-Type: application/json" \
 		--data "{'message': 'Issue #$gh_issue does not exist or is already closed.'}" \
@@ -43,7 +43,7 @@ if ! gh_status=$(gh issue -R "$spdk_repo" view "$gh_issue" --json state --jq .st
 fi
 
 # Get latest info about a change itself - first line is the XSSI mitigation string, drop it
-curl -s -X GET \
+curl --silent --show-error --connect-timeout 10 --max-time 30 --retry 2 -X GET \
 	--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
 	"$gerrit_url/spdk%2Fspdk~$change_num?$gerrit_format_q" \
 	| tail -n +2 | jq . | tee change.json
@@ -109,7 +109,7 @@ GH_TOKEN=$GH_ISSUES_PAT gh issue -R "$spdk_repo" comment "$gh_issue" -b "$messag
 gh run rerun "$fp_run_id" --failed -R "$GH_REPO"
 
 # Reset the verified vote and leave a comment indicating that workflows were retriggered
-curl -L -X POST  \
+curl --connect-timeout 10 --max-time 30 --retry 2 -L -X POST  \
 	--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
 	--header "Content-Type: application/json" \
 	--data "{'message': 'Retriggered', 'labels': {'Verified': '0'}}" \
