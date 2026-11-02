@@ -11,7 +11,10 @@
 # change_num: ${{ fromJSON(needs.env_vars.outputs.client_payload).change.number }}
 # patch_set: ${{ fromJSON(needs.env_vars.outputs.client_payload).patchSet.number }}
 set -euo pipefail
-shopt -s extglob
+
+: "${change_num:?}" "${patch_set:?}"
+[[ "$change_num" =~ ^[1-9][0-9]*$ ]]
+[[ "$patch_set" =~ ^[1-9][0-9]*$ ]]
 
 spdk_repo=$REPO
 gerrit_comment=$COMMENT
@@ -35,7 +38,7 @@ if ! gh_status=$(gh issue -R "$spdk_repo" view "$gh_issue" --json state --jq .st
 	curl --connect-timeout 10 --max-time 30 --retry 2 -L -X POST \
 		--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
 		--header "Content-Type: application/json" \
-		--data "{'message': 'Issue #$gh_issue does not exist or is already closed.'}" \
+		--data "$(jq -n --arg message "Issue #$gh_issue does not exist or is already closed." '{message: $message}')" \
 		--fail-with-body \
 		"$gerrit_url/$change_num/revisions/$patch_set/review"
 	echo "::error title=Invalid Issue::Comment points to incorrect GitHub issue #$gh_issue."
@@ -63,13 +66,14 @@ fi
 
 # Only test latest patch set
 current_patch_set="$(jq -r '.current_revision_number' change.json)"
-if ((current_patch_set != patch_set)); then
+if [[ "$current_patch_set" != "$patch_set" ]]; then
   echo "::notice title=Skipped::Comment posted to different ($current_patch_set) patch set."
 	exit 0
 fi
 
 # False positive should be used only on changes that already have a negative Verified vote
-verified=$(jq -r ".labels.Verified.all[]? | select(.username==\"$GERRIT_BOT_USER\") | .value // 0" change.json)
+verified=$(jq -r --arg user "$GERRIT_BOT_USER" \
+	'.labels.Verified.all[]? | select(.username == $user) | .value // 0' change.json)
 if [[ $verified != -1 ]]; then
 	echo "::notice title=Skipped::Comment posted with no negative vote from CI."
 	exit 0
@@ -80,11 +84,11 @@ fi
 # has to be <= compared to $patch_set the workflow was triggered by.
 # NOTE: Message parsing is very fragile and has to match summary job
 mapfile -t fp_run_failed_messages < <(
-	jq -r ".messages | sort_by(._revision_number)[] |
-		select(.author.username==\"$GERRIT_BOT_USER\") |
-		select(._revision_number<=$patch_set) |
-		select(.message | test(\"Build failed\")) |
-		.message" change.json | grep "Build failed. Results: "
+	jq -r --arg user "$GERRIT_BOT_USER" --argjson patch "$patch_set" \
+		'.messages | sort_by(._revision_number)[] |
+		select(.author.username == $user and ._revision_number <= $patch) |
+		select(.message | contains("Build failed. Results: ")) | .message' change.json \
+		| grep "Build failed. Results: "
 )
 
 if ((${#fp_run_failed_messages[@]} == 0)); then
@@ -95,11 +99,13 @@ fi
 # E.g:
 # Build failed. Results: [15028790454/1](https://github.com/spdk/spdk-ci/actions/runs/15028790454/attempts/3)
 # Build failed. Results: [15028790454/1](https://github.com/spdk/spdk-ci/actions/runs/15028790454)
-fp_run_failed_messages=("${fp_run_failed_messages[@]}")
-# E.g: 15028790454
-fp_run_id=${fp_run_failed_messages[-1]//@(*"runs/"|"/attempts"*)/}
-# E.g: https://github.com/spdk/spdk-ci/actions/runs/15028790454
-fp_run_url=${fp_run_failed_messages[-1]//@(*"("|")")/}
+latest_failure=${fp_run_failed_messages[-1]}
+if [[ ! $latest_failure =~ \]\((https://[^[:space:]\(\)]+/actions/runs/([1-9][0-9]*)(/attempts/[1-9][0-9]*)?)\) ]]; then
+	echo "::error title=Invalid Build Failure::Could not parse the failed workflow URL."
+	exit 1
+fi
+fp_run_url=${BASH_REMATCH[1]}
+fp_run_id=${BASH_REMATCH[2]}
 
 message="Another instance of this failure. Reported by @$reported_by. Log: $fp_run_url"
 # Special PAT to read/write GH issues is required
@@ -112,6 +118,6 @@ gh run rerun "$fp_run_id" --failed -R "$GH_REPO"
 curl --connect-timeout 10 --max-time 30 --retry 2 -L -X POST  \
 	--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
 	--header "Content-Type: application/json" \
-	--data "{'message': 'Retriggered', 'labels': {'Verified': '0'}}" \
+	--data "$(jq -n '{message: "Retriggered", labels: {Verified: 0}}')" \
 	--fail-with-body \
 	"$gerrit_url/$change_num/revisions/$patch_set/review"

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+[[ "$CHANGE_NUM" =~ ^[1-9][0-9]*$ ]]
+[[ "$PATCH_SET" =~ ^[1-9][0-9]*$ ]]
+
 echo "SPDK: (${CHANGE_NUM}/${PATCH_SET}) ${TITLE}" >> "${GITHUB_STEP_SUMMARY}"
 echo "Gerrit: <https://review.spdk.io/c/spdk/spdk/+/${CHANGE_NUM}/${PATCH_SET}>" >> "${GITHUB_STEP_SUMMARY}"
 
@@ -26,13 +29,14 @@ fi
 
 # Only test latest patch set
 current_patch_set="$(jq -r '.current_revision_number' change.json)"
-if ((current_patch_set != PATCH_SET)); then
+if [[ "$current_patch_set" != "$PATCH_SET" ]]; then
     echo "Ignore. Patch set $PATCH_SET is not the latest." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
 fi
 
 # Test only changes without a Verified vote already present
-verified=$(jq -r ".labels.Verified.all[]? | select(.username==\"${GERRIT_BOT_USER}\") | .value // 0" change.json)
+verified=$(jq -r --arg user "$GERRIT_BOT_USER" \
+	'.labels.Verified.all[]? | select(.username == $user) | .value // 0' change.json)
 if [[ -n $verified && $verified != 0 ]]; then
     echo "Ignore. Patch already has a vote from CI." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
