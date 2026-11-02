@@ -183,7 +183,7 @@ def _parse_gerrit_timestamp_to_unix(timestamp):
     if not timestamp:
         return None
     try:
-        return int(datetime.fromisoformat(timestamp).timestamp())
+        return int(datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc).timestamp())
     except Exception:
         logging.warning(f"Failed to parse Gerrit timestamp: {timestamp}")
         return None
