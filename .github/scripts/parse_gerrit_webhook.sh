@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+: "${GERRIT_PROJECT:=spdk/spdk}"
+[[ "$GERRIT_PROJECT" =~ ^spdk/(spdk|spdk\.github\.io)$ ]]
 [[ "$CHANGE_NUM" =~ ^[1-9][0-9]*$ ]]
 [[ "$PATCH_SET" =~ ^[1-9][0-9]*$ ]]
+GERRIT_REPO="${GERRIT_PROJECT#*/}"
 
-echo "SPDK: (${CHANGE_NUM}/${PATCH_SET}) ${TITLE}" >> "${GITHUB_STEP_SUMMARY}"
-echo "Gerrit: <https://review.spdk.io/c/spdk/spdk/+/${CHANGE_NUM}/${PATCH_SET}>" >> "${GITHUB_STEP_SUMMARY}"
+echo "spdk/${GERRIT_REPO}: (${CHANGE_NUM}/${PATCH_SET}) ${TITLE}" >> "${GITHUB_STEP_SUMMARY}"
+echo "Gerrit: <https://review.spdk.io/c/spdk/${GERRIT_REPO}/+/${CHANGE_NUM}/${PATCH_SET}>" >> "${GITHUB_STEP_SUMMARY}"
 
 # Get latest info about a change itself
 curl --silent --show-error \
 	--connect-timeout 10 --max-time 30 --retry 2 \
-	"https://review.spdk.io/changes/spdk%2Fspdk~${CHANGE_NUM}?o=DETAILED_ACCOUNTS&o=LABELS&o=SKIP_DIFFSTAT&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=ALL_FILES" \
+	"https://review.spdk.io/changes/spdk%2F${GERRIT_REPO}~${CHANGE_NUM}?o=DETAILED_ACCOUNTS&o=LABELS&o=SKIP_DIFFSTAT&o=CURRENT_REVISION&o=CURRENT_COMMIT&o=ALL_FILES" \
 	| tail -n +2 > change.json
 
 if [[ ! -s change.json ]]; then

@@ -8,13 +8,16 @@
 # GERRIT_BOT_USER: ${{ secrets.GERRIT_BOT_USER }}
 # GERRIT_BOT_HTTP_PASSWD: ${{ secrets.GERRIT_BOT_HTTP_PASSWD }}
 # GH_ISSUES_PAT: ${{ secrets.GH_ISSUES_PAT }}
+# GERRIT_PROJECT: ${{ fromJSON(env.client_payload).change.project }}
 # change_num: ${{ fromJSON(needs.env_vars.outputs.client_payload).change.number }}
 # patch_set: ${{ fromJSON(needs.env_vars.outputs.client_payload).patchSet.number }}
 set -euo pipefail
 
-: "${change_num:?}" "${patch_set:?}"
+: "${GERRIT_PROJECT:=spdk/spdk}" "${change_num:?}" "${patch_set:?}"
+[[ "$GERRIT_PROJECT" =~ ^spdk/(spdk|spdk\.github\.io)$ ]]
 [[ "$change_num" =~ ^[1-9][0-9]*$ ]]
 [[ "$patch_set" =~ ^[1-9][0-9]*$ ]]
+GERRIT_REPO="${GERRIT_PROJECT#*/}"
 
 spdk_repo=$REPO
 gerrit_comment=$COMMENT
@@ -48,7 +51,7 @@ fi
 # Get latest info about a change itself - first line is the XSSI mitigation string, drop it
 curl --silent --show-error --connect-timeout 10 --max-time 30 --retry 2 -X GET \
 	--user "$GERRIT_BOT_USER:$GERRIT_BOT_HTTP_PASSWD" \
-	"$gerrit_url/spdk%2Fspdk~$change_num?$gerrit_format_q" \
+	"$gerrit_url/spdk%2F${GERRIT_REPO}~$change_num?$gerrit_format_q" \
 	| tail -n +2 | jq . | tee change.json
 
 if [[ ! -s change.json ]]; then
