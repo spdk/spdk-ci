@@ -17,6 +17,17 @@ if [[ ! -s change.json ]]; then
     echo "Change ${CHANGE_NUM} not found, exiting." >> "${GITHUB_STEP_SUMMARY}"
     echo "Either it's a private change or in restricted branch." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
+    exit 0
+fi
+
+# Fail on a Gerrit error page instead of taking it for a closed change.
+jq -e 'type == "object"' change.json > /dev/null
+
+# A queued event may outlive an abandoned or merged change.
+if [[ $(jq -r '.status' change.json) != NEW ]]; then
+    echo "Ignore. Patch is closed." >> "${GITHUB_STEP_SUMMARY}"
+    gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
+    exit 0
 fi
 
 # Do not test any change marked as WIP
@@ -25,6 +36,7 @@ work_in_progress="$(jq -r '.work_in_progress' change.json)"
 if [[ "$work_in_progress" == "true" ]]; then
     echo "Ignore. Patch is currently WIP." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
+    exit 0
 fi
 
 # Only test latest patch set
@@ -32,6 +44,7 @@ current_patch_set="$(jq -r '.current_revision_number' change.json)"
 if [[ "$current_patch_set" != "$PATCH_SET" ]]; then
     echo "Ignore. Patch set $PATCH_SET is not the latest." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
+    exit 0
 fi
 
 # Test only changes without a Verified vote already present
@@ -40,6 +53,7 @@ verified=$(jq -r --arg user "$GERRIT_BOT_USER" \
 if [[ -n $verified && $verified != 0 ]]; then
     echo "Ignore. Patch already has a vote from CI." >> "${GITHUB_STEP_SUMMARY}"
     gh run cancel "${GITHUB_RUN_ID}" -R "${GITHUB_REPOSITORY}"
+    exit 0
 fi
 
 # Get list of files to skip some tests later depending on what files were touched

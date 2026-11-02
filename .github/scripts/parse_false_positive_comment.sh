@@ -56,6 +56,11 @@ if [[ ! -s change.json ]]; then
 	exit 0
 fi
 
+if [[ $(jq -r '.status' change.json) != NEW || $(jq -r '.is_private' change.json) == true ]]; then
+	echo "::notice title=Skipped::Comment posted to a closed or private change."
+	exit 0
+fi
+
 # Do not test any change marked as WIP
 # .work_in_progress is not set when false
 work_in_progress="$(jq -r '.work_in_progress' change.json)"
