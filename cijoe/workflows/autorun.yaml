@@ -132,7 +132,7 @@ steps:
 
 - name: check-so-deps-container-autotest
   run: |
-    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/check-so-deps-container-autotest.conf && ocf_precompile && SPDK_ABI_DIR=/opt/spdk-abi check_so_deps
+    rootdir=/opt/spdk && cd $rootdir && source ./test/common/autobuild_common.sh /opt/configs/check-so-deps-container-autotest.conf && ocf_precompile && SPDK_ABI_DIR=/opt/spdk-abi check_so_deps && { ! declare -F rdma_without_rdma_core > /dev/null || rdma_without_rdma_core; }
 
 - name: packaging-container-autotest
   run: |
