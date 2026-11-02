@@ -1,0 +1,282 @@
+/* ----------------------------------------------------------------
+   Copied from spdk.github.io assets/css/spdk.css. Keep these rules the
+   same as there, in the same order, so a diff shows any drift.
+   ---------------------------------------------------------------- */
+
+:root {
+    --spdk-brand: #2b497d;
+    --spdk-brand-dark: #213861;
+    --spdk-border: #dee2e6;
+    --spdk-surface: #f8f9fa;
+    --spdk-code-bg: #f0f2f5;
+    --spdk-content-max: 1296px;
+}
+
+body {
+    margin: 0;
+}
+
+main,
+.navbar,
+.footer {
+    font-family: 'Roboto', sans-serif;
+}
+
+main {
+    color: #212529;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+main a {
+    color: var(--spdk-brand);
+}
+
+main :is(h1, h2, h3, h4, h5, h6) {
+    line-height: 1.2;
+}
+
+/* Hidden until it gets keyboard focus. */
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 8px;
+    z-index: 100;
+    padding: 8px 12px;
+    background: #fff;
+    color: var(--spdk-brand);
+}
+
+.skip-link:focus {
+    top: 8px;
+}
+
+.container {
+    max-width: var(--spdk-content-max);
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+/* ----------------------------------------------------------------
+   Navbar
+   ---------------------------------------------------------------- */
+.navbar {
+    display: flex;
+    align-items: center;
+    background-color: var(--spdk-brand);
+    padding: 0 0.5rem;
+}
+
+.navbar-brand {
+    padding: 0.5rem 0.5rem 0.5rem 10px;
+    flex-shrink: 0;
+}
+
+.navbar-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.navbar-end {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    margin-right: 1rem;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.65);
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: 14px;
+    letter-spacing: 1px;
+    padding: 25px 8px;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: #fff;
+}
+
+.navbar-nav-svg {
+    fill: #fff;
+    height: 32px;
+    width: 32px;
+    display: block;
+}
+
+/* ----------------------------------------------------------------
+   Footer
+   ---------------------------------------------------------------- */
+.footer {
+    background-color: var(--spdk-brand);
+    text-align: center;
+    font-size: 14px;
+    padding: 10px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.footer a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.footer a:hover {
+    color: #fff;
+}
+
+.footer-inner {
+    max-width: var(--spdk-content-max);
+    margin: 0 auto;
+    padding: 0.5rem 15px;
+}
+
+.footer-copy small {
+    font-size: 12px;
+}
+
+@media (max-width: 767.98px) {
+    /* Logo and icons stay on the first row, links wrap below them. */
+    .navbar {
+        flex-wrap: wrap;
+    }
+
+    .navbar-nav {
+        order: 3;
+        width: 100%;
+        padding-bottom: 6px;
+    }
+
+    .navbar-end {
+        margin-right: 0.5rem;
+    }
+
+    .nav-link {
+        letter-spacing: 0;
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+}
+
+/* ----------------------------------------------------------------
+   Status pages
+   ---------------------------------------------------------------- */
+
+:root {
+    --spdk-muted: #6c757d;
+    --spdk-success: #198754;
+    --spdk-warning: #ffc107;
+    --spdk-danger: #dc3545;
+}
+
+/* The logo loads from spdk.io. A block image keeps its 36px size even if
+   that fails, instead of turning into a line of alt text. */
+.navbar-brand img {
+    display: block;
+}
+
+/* Keep the footer at the bottom of short pages. */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Without the width, a flex item with auto margins grows to the width of
+   its table. The main.container selector keeps .container from resetting
+   the padding. */
+main.container {
+    box-sizing: border-box;
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    padding-top: 1rem;
+    padding-bottom: 1.5rem;
+}
+
+.page-meta {
+    margin-bottom: 1.5rem;
+}
+
+.page-meta p {
+    margin: .25rem 0;
+}
+
+section {
+    margin-bottom: 2rem;
+}
+
+section h2 {
+    margin: 0;
+    padding: .75rem 1rem;
+    color: #fff;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    border-radius: 4px 4px 0 0;
+}
+
+.section-success h2 { background: var(--spdk-success); }
+.section-warning h2 { background: var(--spdk-warning); color: #212529; }
+.section-danger h2  { background: var(--spdk-danger); }
+.section-brand h2   { background: var(--spdk-brand); }
+
+.table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    background: #fff;
+}
+
+th, td {
+    padding: .6rem .75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--spdk-border);
+    overflow-wrap: anywhere;
+}
+
+thead th {
+    background: var(--spdk-brand-dark);
+    color: #fff;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+th:first-child,
+td:first-child {
+    white-space: nowrap;
+}
+
+tbody tr:nth-child(even) {
+    background: var(--spdk-surface);
+}
+
+.badge {
+    display: inline-block;
+    padding: .25em .5em;
+    font-size: .8rem;
+    font-weight: 700;
+    border-radius: 4px;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.badge-success { background: var(--spdk-success); }
+.badge-warning { background: var(--spdk-warning); color: #212529; }
+
+.muted {
+    color: var(--spdk-muted);
+}
+
+.note {
+    margin-bottom: 1.5rem;
+}
+
+.empty {
+    padding: .75rem 1rem;
+}
