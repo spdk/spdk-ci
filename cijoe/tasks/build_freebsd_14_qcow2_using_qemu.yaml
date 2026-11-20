@@ -2,13 +2,13 @@
 doc: |
   Create a .qcow2 image using cloud-init and SPDK pkgdep.sh / autotest_setup.sh
 
-  In greater detail, then this workflow utilize the following tech
+  In greater detail, this task uses the following tech
 
   * qemu
   * cloud-init
   * cijoe
 
-  The workflow can re-use scripts built-in / bundled with the default cijoe
+  The task can re-use scripts built-in / bundled with the default cijoe
   installation, which delegates most of command-line calls into scripts. As an
   overview, the following is done
 
@@ -21,7 +21,7 @@ doc: |
   some other tool or script.
 
   * Convert the image (with compression)
-    - qemu-img convert boot.img /tmp/fedora_43-x86_64.qcow2 -O qcow2 -c
+    - qemu-img convert boot.img /tmp/freebsd_14-x86_64.qcow2 -O qcow2 -c
 
   * Upload it to publically available storage
 
@@ -29,42 +29,42 @@ steps:
 - name: diskimage_from_cloudimage
   uses: system_imaging.diskimage_from_cloudimage
   with:
-    pattern: "{{ local.env.DISTRO }}-x86_64"
+    pattern: "freebsd_14-x86_64"
 
 - name: guest_initialize
   uses: qemu.guest_initialize
   with:
     guest_name: generic-bios-kvm-x86_64
-    system_image_name: "{{ local.env.DISTRO }}-x86_64"
+    system_image_name: freebsd_14-x86_64
 
 - name: guest_start
   uses: qemu.guest_start
   with:
     guest_name: generic-bios-kvm-x86_64
 
-# xargs gets rid of the trailing whitespace
 - name: guest_growparts
   run: >-
     hostname;
     uname -a;
-    root_source=$(findmnt -n -o SOURCE -T /);
-    root_device=${root_source%%\[*};
-    disk=$(lsblk -n -o PKNAME "$root_device" | xargs);
-    partition=$(lsblk -n -o PARTN "$root_device" | xargs);
     df -h;
-    growpart "/dev/$disk" "$partition";
-    btrfs filesystem resize max /;
-    df -h
+    gpart show;
+    gpart recover vtbd0;
+    gpart resize -i 4 -s +10G vtbd0 || true;
+    gpart show;
+    zpool list;
+    zpool online -e zroot vtbd0p4 || true;
+    zpool list;
+    df -h;
 
 - name: guest_update
   run: |
-    dnf update -y
-    dnf install -y git perl-JSON-PP
-    dnf autoremove -y
-    dnf clean all -y
+    pkg install -y git
 
-- name: guest_info
-  uses: linux.sysinfo
+- name: kernel_src
+  run: |
+    # TODO: consider revert back to using `core.repository_prep` once `shallow` and `single-branch` options are added to cijoe
+    mkdir -p "{{ local.env.HOME }}/git/freebsd"
+    curl -L https://github.com/freebsd/freebsd-src/archive/refs/tags/release/14.2.0-p3.tar.gz | tar -xz -C "{{ local.env.HOME }}/git/freebsd" --strip-components=1
 
 - name: tgz_transfer
   uses: core.put
@@ -82,13 +82,13 @@ steps:
   run: |
     /tmp/spdk/scripts/pkgdep.sh -a
     mkdir /tmp/git_repos
-    /tmp/spdk/test/common/config/autotest_setup.sh --install-deps --upgrade --dir-git="/tmp/git_repos" --test-conf="lcov,flamegraph,fio,nvmecli,bpftrace,qemu,doxygen"
+    CC=gcc14 SYSDIR="{{ local.env.HOME }}/git/freebsd/sys" /tmp/spdk/test/common/config/autotest_setup.sh --install-deps --upgrade --dir-git="/tmp/git_repos" --test-conf="lcov,flamegraph,fio,nvmecli,bpftrace,qemu,contigmem"
     rm -r /tmp/git_repos
 
 - name: guest_shutdown
   run: |
     sync
-    systemctl poweroff
+    shutdown -p now
 
 - name: guest_wait
   uses: qemu.guest_wait_for_termination
