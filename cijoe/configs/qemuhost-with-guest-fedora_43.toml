@@ -9,7 +9,7 @@ password = "root"
 hostname = "localhost"
 port = 4200
 
-[cijoe.workflow]
+[cijoe.task]
 fail_fast = true
 
 # Used by: the qemu.*.py scripts
