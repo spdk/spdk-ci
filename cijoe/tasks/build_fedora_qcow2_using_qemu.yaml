@@ -2,13 +2,13 @@
 doc: |
   Create a .qcow2 image using cloud-init and SPDK pkgdep.sh / autotest_setup.sh
 
-  In greater detail, then this workflow utilize the following tech
+  In greater detail, this task uses the following tech
 
   * qemu
   * cloud-init
   * cijoe
 
-  The workflow can re-use scripts built-in / bundled with the default cijoe
+  The task can re-use scripts built-in / bundled with the default cijoe
   installation, which delegates most of command-line calls into scripts. As an
   overview, the following is done
 
@@ -36,6 +36,9 @@ steps:
   with:
     guest_name: generic-bios-kvm-x86_64
     system_image_name: "{{ local.env.DISTRO }}-x86_64"
+    # build_qcow2.yml converts boot.img into this image's disk.path, and
+    # qemu-img cannot write to the backing file of the image it reads.
+    overlay: false
 
 - name: guest_start
   uses: qemu.guest_start
@@ -64,7 +67,7 @@ steps:
     dnf clean all -y
 
 - name: guest_info
-  uses: linux.sysinfo
+  uses: core.facts_gather
 
 - name: tgz_transfer
   uses: core.put

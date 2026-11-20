@@ -10,9 +10,9 @@ changed_files=()
 # If triggered by a push event, build all of the distros which may have been affected
 # by the change.
 # * .github/workflows/build_qcow2.yml - main workflow changed, build all supported distros
-# * cijoe/configs/*.toml or cijoe/workflows/*.yaml - configration changed, add affected distro
+# * cijoe/configs/*.toml or cijoe/tasks/*.yaml - configuration changed, add affected distro
 #   to the list of distros to build.
-# * cijoe/workflows/build_<name>_qcow2_using_qemu.yaml - workflow shared by all versions of
+# * cijoe/tasks/build_<name>_qcow2_using_qemu.yaml - task shared by all versions of
 #   a distro changed, build every version.
 if [[ "$GH_EVENT_NAME" == "workflow_dispatch" ]]; then
 	distros_to_build+=("$GH_INPUTS_DISTRO")
@@ -24,10 +24,10 @@ fi
 for file in "${changed_files[@]}"; do
 	case "$file" in
 		*build_qcow2.yml)
-			workflows_distros=(cijoe/workflows/build_+([a-zA-Z])_+([0-9])_qcow2_using_qemu.yaml)
-			workflows_distros=("${workflows_distros[@]#*build_}")
-			workflows_distros=("${workflows_distros[@]%_qcow2*}")
-			distros_to_build+=("${workflows_distros[@]}")
+			tasks_distros=(cijoe/tasks/build_+([a-zA-Z])_+([0-9])_qcow2_using_qemu.yaml)
+			tasks_distros=("${tasks_distros[@]#*build_}")
+			tasks_distros=("${tasks_distros[@]%_qcow2*}")
+			distros_to_build+=("${tasks_distros[@]}")
 			;;
 		*qemuhost-with-guest-*.toml|*build_+([a-zA-Z])_+([0-9])_qcow2_using_qemu.yaml)
 			distro=${file//@(*qemuhost-with-guest-|*build_)}
@@ -37,10 +37,10 @@ for file in "${changed_files[@]}"; do
 		*build_+([a-zA-Z])_qcow2_using_qemu.yaml)
 			distro_name=${file##*build_}
 			distro_name=${distro_name%_qcow2_using_qemu.yaml}
-			workflows_distros=(cijoe/workflows/build_"$distro_name"_+([0-9])_qcow2_using_qemu.yaml)
-			workflows_distros=("${workflows_distros[@]#*build_}")
-			workflows_distros=("${workflows_distros[@]%_qcow2*}")
-			distros_to_build+=("${workflows_distros[@]}")
+			tasks_distros=(cijoe/tasks/build_"$distro_name"_+([0-9])_qcow2_using_qemu.yaml)
+			tasks_distros=("${tasks_distros[@]#*build_}")
+			tasks_distros=("${tasks_distros[@]%_qcow2*}")
+			distros_to_build+=("${tasks_distros[@]}")
 			;;
 		*) ;;
 	esac
