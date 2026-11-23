@@ -36,6 +36,9 @@ steps:
   with:
     guest_name: generic-bios-kvm-x86_64
     system_image_name: "{{ local.env.DISTRO }}-x86_64"
+    # build_qcow2.yml converts boot.img into this image's disk.path, and
+    # qemu-img cannot write to the backing file of the image it reads.
+    overlay: false
 
 - name: guest_start
   uses: qemu.guest_start
