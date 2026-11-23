@@ -18,3 +18,8 @@ updates:
   directory: "/infra"
   schedule:
     interval: "weekly"
+
+- package-ecosystem: "pip"
+  directory: "/.github/actions/install_cijoe"
+  schedule:
+    interval: "weekly"

@@ -1,0 +1,2 @@
+# Every job that runs CIJoe installs this version. Dependabot updates it.
+cijoe==0.9.54
