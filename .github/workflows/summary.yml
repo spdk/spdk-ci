@@ -62,10 +62,15 @@ jobs:
           update
         sudo apt-get install -y lcov python3-pandas python3-tabulate
         # This step is needed for auto code generation of the header file `include/spdk_internal/rpc_autogen.h`
-        ./configure --without-nvme-cuse
-        make -C include jsonrpc
+        # v26.01.x has no such header and keeps autorun_post.py in the top directory.
+        if [[ -e include/spdk_internal/rpc_autogen.h.jinja2 ]]; then
+          ./configure --without-nvme-cuse
+          make -C include jsonrpc
+        fi
+        autorun_post=scripts/autorun_post.py
+        [[ -e $autorun_post ]] || autorun_post=autorun_post.py
         # Now can run post processing
-        ./scripts/autorun_post.py -d ../_autorun_summary -r ./
+        ./$autorun_post -d ../_autorun_summary -r ./
         echo "result=success" >> "$GITHUB_OUTPUT"
 
     - name: Upload artifacts
