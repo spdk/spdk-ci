@@ -67,7 +67,7 @@ steps:
     dnf clean all -y
 
 - name: guest_info
-  uses: linux.sysinfo
+  uses: core.facts_gather
 
 - name: tgz_transfer
   uses: core.put
