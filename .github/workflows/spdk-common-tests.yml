@@ -409,6 +409,14 @@ jobs:
           ci/cijoe/report_${{ matrix.name }}_provision
         name: common-cijoe-${{ matrix.name }}${{ env.ARTIFACT_SUFFIX }}
 
+    # Shows how far a guest that did not come up got in booting, see spdk/spdk#3790.
+    - name: Upload guest serial console
+      uses: actions/upload-artifact@v7.0.2
+      if: failure() && matrix.guest
+      with:
+        path: ~/guests/generic-bios-kvm-x86_64/serial.output
+        name: common-serial-${{ matrix.name }}${{ env.ARTIFACT_SUFFIX }}
+
     - name: qemu-guest, list output
       if: always() && hashFiles('ci/cijoe/workflows/autorun.yaml')
       timeout-minutes: 1
