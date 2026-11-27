@@ -69,7 +69,7 @@ services:
     - gerrit
 
   prometheus:
-    image: prom/prometheus:v3.13.4
+    image: prom/prometheus:v3.16.0
     container_name: prometheus
     restart: always
     ports:
