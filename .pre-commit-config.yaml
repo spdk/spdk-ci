@@ -12,7 +12,7 @@ repos:
     args: [--check]
     files: \.toml$
 
-# This is for CIJOE and GitHUB Action Workflow files
+# This is for CIJOE tasks and GitHub Actions workflows
 - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
   rev: 0.2.3
   hooks:

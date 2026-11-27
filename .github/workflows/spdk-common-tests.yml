@@ -308,13 +308,6 @@ jobs:
         done
         exit 1
 
-    # cijoe - for running cijoe workflows instead of writing own manual scrits;
-    #         TODO: Installation doesn't take long but we should bake it into the container image.
-    - name: Install cijoe
-      if: ${{ !matrix.guest }}
-      run: |
-        pip install cijoe==0.9.54
-
     # ghcr.io/spdk/spdk-ci:fedora_43 is about ~10GB in size, leaving us with not much space
     # for tests after pulling the image. Reclaim some by removing features not used in SPDK tests
     # See: https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
@@ -332,14 +325,13 @@ jobs:
           /host-usr-local/share/chromedriver-linux64 \
           /host-usr-local/kotlin
 
-    - name: Setup PATH
-      run: |
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-
     - name: Checkout CI repository
       uses: actions/checkout@v7
       with:
         path: ci
+
+    - name: Install cijoe
+      uses: ./ci/.github/actions/install_cijoe
 
     - name: Download the SPDK repository
       uses: actions/download-artifact@v8.0.2
@@ -380,21 +372,21 @@ jobs:
       if: ${{ matrix.guest }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml guest_initialize guest_start guest_check \
+        cijoe tasks/autorun.yaml guest_initialize guest_start guest_check \
         --output report_${{ matrix.name }}_prep_guest \
         --monitor
 
     - name: qemu-guest, provision
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
+        cijoe tasks/autorun.yaml guest_check tgz_transfer abi_transfer ci_configs_transfer tgz_unpack output_create \
         --output report_${{ matrix.name }}_provision \
         --monitor
 
     - name: qemu-guest, ${{ matrix.name }}
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml ${{ matrix.name }} \
+        cijoe tasks/autorun.yaml ${{ matrix.name }} \
         --output report_${{ matrix.name }} \
         --monitor
 
@@ -418,20 +410,20 @@ jobs:
         name: common-serial-${{ matrix.name }}${{ env.ARTIFACT_SUFFIX }}
 
     - name: qemu-guest, list output
-      if: always() && hashFiles('ci/cijoe/workflows/autorun.yaml')
+      if: always() && hashFiles('ci/cijoe/tasks/autorun.yaml')
       timeout-minutes: 1
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml output_listing \
+        cijoe tasks/autorun.yaml output_listing \
         --output report_${{ matrix.name }}_cleanup \
         --monitor
 
     - name: qemu-guest, retrieve output
-      if: always() && hashFiles('ci/cijoe/workflows/autorun.yaml')
+      if: always() && hashFiles('ci/cijoe/tasks/autorun.yaml')
       timeout-minutes: 3
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml retrieve_autorun_output \
+        cijoe tasks/autorun.yaml retrieve_autorun_output \
         --output report_${{ matrix.name }}_retrieve \
         --monitor
 
@@ -443,12 +435,12 @@ jobs:
         name: common-job-${{ matrix.name }}${{ env.ARTIFACT_SUFFIX }}
 
     - name: qemu-guest, shutdown
-      if: always() && matrix.guest && hashFiles('ci/cijoe/workflows/autorun.yaml') && (runner.environment == 'self-hosted'
-        || env.ACT == 'true')
+      if: always() && matrix.guest && hashFiles('ci/cijoe/tasks/autorun.yaml') && (runner.environment == 'self-hosted' ||
+        env.ACT == 'true')
       timeout-minutes: 2
       run: |
         cd ci/cijoe
-        cijoe workflows/autorun.yaml guest_shutdown \
+        cijoe tasks/autorun.yaml guest_shutdown \
         --output report_${{ matrix.name }}_guest_shutdown \
         --monitor
 
