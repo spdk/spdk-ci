@@ -28,7 +28,7 @@ services:
       exec nginx -g 'daemon off;'
 
   nginx-log-exporter:
-    image: ghcr.io/jkroepke/access-log-exporter:0.5.2
+    image: ghcr.io/jkroepke/access-log-exporter:1.0.3
     container_name: nginx-log-exporter
     restart: always
     command: ["--preset", "simple"]
